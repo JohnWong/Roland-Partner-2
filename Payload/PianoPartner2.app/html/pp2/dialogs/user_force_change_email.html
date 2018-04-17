@@ -1,0 +1,88 @@
+<!-- エディタ参照のみの用途 -->
+<head>
+    <link rel="stylesheet" type="text/css" href="../../bootstrap-3.3.6-dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" type="text/css" href="../../bootstrap-3.3.6-dist/css/bootstrap-theme.min.css" />
+    <link rel="stylesheet" type="text/css" href="../../animsition/css/animsition.min.css" />
+    <link rel="stylesheet" type="text/css" href="../../css/pp2.css" />
+</head>
+<!-- / -->
+
+<script type="text/javascript">
+    $(function() {
+        var modal = $('.modal.user_force_change_email');
+        modal.find('.modal-dialog').css({width: '500px'});
+        var modalBody = modal.find('.modal-body');
+        modalBody.css('height', (document.documentElement.clientHeight - 220) + 'px');
+
+        var cancelButton = modal.find('.cancel-button');
+        var submitButton = modal.find('.submit-button');
+
+        submitButton.on('click', function() {
+            var form = modal.find('form');
+            var email = modal.find('input[name=force-email]').val();
+            form.validator().on('submit', function (e) {
+                if (!e.isDefaultPrevented()) {
+                    PP2_FRONT.showLoading(true);
+                    PP2_DB_AWS_HANDLER.updateEmail(email, function () {
+                        PP2_AWS.saveUsers([PP2_DB.currentUser], function () {}, function (err) {
+                            PP2_FRONT.alert(err);
+                        });
+                        PP2_FRONT.hideLoading();
+                        PP2_FRONT.switchModal(modal, 'user_force_verify_email');
+                    }, function (err) {
+                        PP2_FRONT.hideLoading();
+                        PP2_FRONT.alert(PP2_LANGUAGE.getValues().cognito_error_others_when_update + '\n' + err);
+                    });
+                }
+                e.preventDefault();
+            }).submit();
+        });
+        cancelButton.on('click', function() {
+            PP2_FRONT.switchModal(modal, 'user_force_verify_email');
+        });
+    });
+    //# sourceURL=dialogs/user_force_change_email.js
+</script>
+
+<style type="text/css">
+    .modal.user_force_change_email .modal-body {
+        padding: 0;
+        border-bottom: solid 1px #BFC0C1;
+        overflow-y: auto;
+        overflow-x: hidden;
+        -webkit-overflow-scrolling: touch;
+    }
+    .modal.user_force_change_email .modal-footer {
+        padding: 10px;
+    }
+    .modal.user_force_change_email .modal-footer button:first-child {
+        float: left;
+    }
+    .modal.user_force_change_email .modal-footer button.btn-default {
+        color: #F37321;
+        border-color: #F37321;
+    }
+</style>
+
+<script type="text/html" id="header">
+</script>
+
+<script type="text/html" id="body">
+    <form class="user" data-toggle="validator">
+        <div class="form-group">
+            <span class="title"><lang key="user_email"></lang></span>
+            <input class="form-control" name="force-email" type="email" required data-error="Invalid email." data-required-error="Required." />
+            <div class="help-block with-errors"></div>
+        </div>
+        <div class="form-group">
+            <span class="title"><lang key="user_email_confirm"></lang></span>
+            <input class="form-control" name="force-email-confirm" type="email" data-match="[name=force-email]" required data-required-error="Required." data-match-error="Not match." />
+            <div class="help-block with-errors"></div>
+        </div>
+    </form>
+</script>
+
+<script type="text/html" id="footer">
+    <button class="cancel-button btn btn-default"><lang key="cancel"></lang></button>
+    <button class="submit-button btn btn-default"><lang key="submit"></lang></button>
+</script>

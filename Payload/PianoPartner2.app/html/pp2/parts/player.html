@@ -1,0 +1,210 @@
+<!-- エディタ参照のみの用途 -->
+<head>
+    <link rel="stylesheet" type="text/css" href="../../bootstrap-3.3.6-dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" type="text/css" href="../../bootstrap-3.3.6-dist/css/bootstrap-theme.min.css" />
+    <link rel="stylesheet" type="text/css" href="../../animsition/css/animsition.min.css" />
+    <link rel="stylesheet" type="text/css" href="../../css/pp2.css" />
+</head>
+<!-- / -->
+
+<script type="text/javascript">
+    $(function() {
+        var isPlaying = false;
+        var currentNumerator;
+        var currentDenominator;
+
+        var updateBeat = function() {
+            if (undefined != currentNumerator && undefined != currentDenominator) {
+                $('#sequencer-beat').html(_.sprintf('%d/%d', currentNumerator, currentDenominator));
+            }
+        };
+
+        var previousNotation;
+        var previousTempo;
+        var tempoImg = $('<img />');
+        var tempoValue = $('<span />');
+        $('#sequencer-tempo').empty().append(tempoImg).append(tempoValue);
+        var updateTempo = function(notation, tempo) {
+            notation = undefined !== notation ? notation : PP2_MIDI.getCachedValue(p2addr.sequencerTempoNotation);
+            tempo = undefined !== tempo ? tempo : PP2_MIDI.getCachedValue(p2addr.sequencerTempoRO);
+            if (undefined !== tempo && (previousNotation !== notation || previousTempo !== tempo)) {
+                tempoImg.attr('src', './images/note_' + notation + '.png');
+                tempoValue.text(' = ' + tempo);
+            }
+            previousNotation = notation;
+            previousTempo = tempo;
+        };
+
+        var updateMeasure = function(measure) {
+            $('#sequencer-measure').html('M: ' + (measure == 0 ? 'PU' : measure));
+        }
+
+        PP2_MIDI.addCallback(p2addr.songToneLanguage, function(params) {
+            PP2_LANGUAGE.setSongToneLanguage(params.value);
+            PP2_MIDI.request(p2addr.songNumber);
+        });
+        PP2_MIDI.addCallback(p2addr.sequencerTempoNotation, function() {
+            updateTempo();
+        });
+        PP2_MIDI.addCallback(p2addr.sequencerTempoRO, function() {
+            updateTempo();
+        });
+        PP2_MIDI.addCallback(p2addr.sequencerMeasure, function(params) {
+            updateMeasure(params.value);
+        });
+        PP2_MIDI.addCallback(p2addr.sequencerBeatNumerator, function(params) {
+            currentNumerator = params.value;
+            updateBeat();
+        });
+        PP2_MIDI.addCallback(p2addr.sequencerBeatDenominator, function(params) {
+            currentDenominator = params.value;
+            updateBeat();
+        });
+        PP2_MIDI.addCallback(p2addr.sequencerStatus, function(params) {
+            isPlaying = params.value == 1;
+            if (isPlaying) {
+                $('#sequencer-btn-play').removeClass('icbtn-play').addClass('icbtn-pause');
+                PP2_CORE.addNotSleepTag('piano_player');
+            } else {
+                $('#sequencer-btn-play').removeClass('icbtn-pause').addClass('icbtn-play');
+                PP2_CORE.removeNotSleepTag('piano_player');
+            }
+        });
+        var setSong = function(params) {
+            console.log('categoryNo : ' + params.categoryNo + ' number : ' + params.number);
+            // 範囲外のcategoryNoが来た場合は補正
+            params.categoryNo = params.categoryNo > PP2_CONTENTS.getSongList().category.length ? 0 : params.categoryNo;
+            PP2_MIDI.requestSequencerStatuses();
+            if (params.categoryNo != 0) {
+                var category = PP2_CONTENTS.getSongList().category[params.categoryNo - 1];
+                var song = category.song[params.number];
+                if (undefined != song) {
+                    $('#song-name').html(PP2_LANGUAGE.isSongToneLanguageJa() ? song.name_jp : song.name);
+                    $('#song-composer').html(PP2_LANGUAGE.isSongToneLanguageJa() ? song.composer_jp : song.composer);
+                }
+            }else{
+                switch (PP2_CORE.getCurrentApplicationMode()) {
+                    case PP2_CORE.applicationModes.Songs:
+                        $('#song-name').html(PP2_LANGUAGE.getValues().song_cannot_diplay_song);
+                        break;
+                    case PP2_CORE.applicationModes.DigiScoreLite:
+                        $('#song-name').html(PP2_LANGUAGE.getValues().digiscore_cannot_diplay_song);
+                        break;
+                    default:
+                }
+                $('#song-composer').html('&nbsp;');
+                $('#sequencer-measure').html('&nbsp;');
+                $('#sequencer-beat').html('&nbsp;');
+                updateTempo(5, '&nbsp;');
+            }
+        };
+
+        PP2_MIDI.addCallback(p2addr.songNumber, setSong);
+        
+        if (PP2_CONTENTS.isLanguageSettingAvailable()) {
+            PP2_MIDI.request(p2addr.songToneLanguage);
+        } else {
+            PP2_MIDI.request(p2addr.songNumber);
+        }
+
+        // 呼び出し元から操作する用のメソッド群定義
+        PP2_FRONT.scriptPool.playerIF = {
+            setSong: setSong
+        }
+
+        PP2_MIDI.setupSequencerButton($('#sequencer-btn-reset'), p2addr.sequencerReset);
+        PP2_MIDI.setupSequencerButton($('#sequencer-btn-play'), p2addr.sequencerPlayStopToggle);
+        PP2_MIDI.setupSequencerButton($('#sequencer-btn-rew'), p2addr.sequencerREW);
+        PP2_MIDI.setupSequencerButton($('#sequencer-btn-ff'), p2addr.sequencerFF);
+
+        // ボタンセットアップ
+        var onTempoChange = function(isFinish) {
+            if (isFinish) {
+                setTimeout(function() {PP2_MIDI.request([p2addr.sequencerTempoNotation, p2addr.sequencerTempoRO]);}, 500);
+            } else {
+                PP2_MIDI.request([p2addr.sequencerTempoNotation, p2addr.sequencerTempoRO]);
+            }
+        };
+        PP2_MIDI.setupSequencerButton($('#sequencer-btn-tempo-down'), p2addr.sequencerTempoDown, onTempoChange);
+        PP2_MIDI.setupSequencerButton($('#sequencer-btn-tempo-up'), p2addr.sequencerTempoUp, onTempoChange);
+        $('#sequencer-btn-previous-song').on('click', PP2_MIDI.sendPreviousSong);
+        $('#sequencer-btn-next-song').on('click', PP2_MIDI.sendNextSong);
+
+        _.forEach($('.marquee'), function(v) {
+            PP2_FRONT.marquee($(v));
+        });
+    });
+</script>
+
+<style type="text/css">
+    .player-left-panel {
+        padding-top: 20px;
+    }
+    .player-left-panel, .player-right-panel {
+        width: 250px;
+        background-color: #E1E2E3;
+    }
+    .player-left-panel button {
+        margin: 0 3px;
+    }
+    .player-left-panel button div, .player-center-panel button div {
+        width: 38px;
+        height: 38px;
+    }
+    .player-left-panel button:nth-child(1), .player-left-panel button:nth-child(3) {
+        padding: 0;
+    }
+    .player-left-panel button:nth-child(2) {
+        width: 128px;
+        height: 40px;
+    }
+    .player-center-panel button {
+        padding: 0;
+    }
+    .player-center-panel .player-tempo-display-button {
+        margin-top: -2px;
+        padding: 0 7px;
+    }
+    .player-right-panel button {
+        height: 100%;
+        width: 46px;
+        margin: 0;
+        padding: 0;
+    }
+    .player-info {
+        font-size: 16px;
+    }
+    #sequencer-tempo {
+        text-align: left;
+        padding-left: 10px;
+    }
+    #sequencer-tempo img {
+        width: 9px;
+        height: 15px;
+    }
+</style>
+
+<script type="text/html" id="body">
+    <div class="abs t0 b0 l0 player-left-panel">
+        <button class="btn btn-default" id="sequencer-btn-tempo-down"><div class="icbtn icbtn-minus"></div></button>
+        <button class="btn btn-default" id="sequencer-btn-tempo-settings" onclick="if (PP2_CONTENTS.isSequencerTempoExpansion()) {PP2_FRONT.showModal('sequencer_tempo_settings', 500);}"><lang key="tempo"></lang></button>
+        <button class="btn btn-default" id="sequencer-btn-tempo-up"><div class="icbtn icbtn-plus"></div></button>
+    </div>
+    <div class="abs t0 b0 player-center-panel" style="left: 250px;right: 250px;background-color: #EFF0F1;">
+        <button class="btn btn-default" style="display: inline-block; position: absolute; left: 10px; top: 5px;" id="sequencer-btn-previous-song"><div class="icbtn icbtn-minus"></div></button>
+        <div class="abs t0 marquee" style="height: 50px;line-height: 50px;font-size: 22px;left: 60px;right: 60px;"><span id="song-name"></span></div>
+        <button class="btn btn-default" style="display: inline-block; position: absolute; right: 10px; top: 5px;" id="sequencer-btn-next-song"><div class="icbtn icbtn-plus"></div></button>
+        <div class="abs r0 b0 l0 player-info" style="height: 30px;">
+            <div class="abs t0 b0 l0" style="width: 70px;" id="sequencer-tempo">♪=-</div>
+            <div class="abs t0 b0" style="left: 70px;width: 50px;" id="sequencer-beat">-/-</div>
+            <div class="abs t0 b0" style="left: 120px;width: 60px;" id="sequencer-measure">-:-</div>
+            <div class="abs t0 r0 b0 marquee" style="left: 180px;"><span id="song-composer"></span></div>
+        </div>
+    </div>
+    <div class="abs t0 r0 b0 player-right-panel">
+        <button class="icbtn icbtn-reset" id="sequencer-btn-reset"></button>
+        <button class="icbtn icbtn-play" id="sequencer-btn-play"></button>
+        <button class="icbtn icbtn-rew" id="sequencer-btn-rew"></button>
+        <button class="icbtn icbtn-ff" id="sequencer-btn-ff"></button>
+    </div>
+</script>

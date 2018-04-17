@@ -1,0 +1,102 @@
+<!-- エディタ参照のみの用途 -->
+<head>
+    <link rel="stylesheet" type="text/css" href="../../bootstrap-3.3.6-dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" type="text/css" href="../../bootstrap-3.3.6-dist/css/bootstrap-theme.min.css" />
+    <link rel="stylesheet" type="text/css" href="../../animsition/css/animsition.min.css" />
+    <link rel="stylesheet" type="text/css" href="../../css/pp2.css" />
+</head>
+<!-- / -->
+
+<script type="text/javascript">
+    $(function() {
+        var playModeButton = $('#play-mode-btn');
+        var playModeButtonHandler = PP2_CONTENTS.isSequencerOneSongRepeatAvailable() ? function(mode) {
+            switch (mode) {
+                case 0:
+                    playModeButton.removeClass('on-order');
+                    playModeButton.removeClass('on-random');
+                    playModeButton.removeClass('on-onesong');
+                    break;
+                case 1:
+                    playModeButton.addClass('on-order');
+                    playModeButton.removeClass('on-random');
+                    break;
+                case 2:
+                    playModeButton.removeClass('on-order');
+                    playModeButton.addClass('on-random');
+                    break;
+                case 3:
+                    playModeButton.removeClass('on-random');
+                    playModeButton.addClass('on-onesong');
+                    break;
+            }
+        } : function(mode) {
+            switch (mode) {
+                case 0:
+                    playModeButton.removeClass('on-order');
+                    playModeButton.removeClass('on-random');
+                    break;
+                case 1:
+                    playModeButton.addClass('on-order');
+                    playModeButton.removeClass('on-random');
+                    break;
+                case 2:
+                    playModeButton.removeClass('on-order');
+                    playModeButton.addClass('on-random');
+                    break;
+            }
+        };
+        PP2_FRONT.initToggleIcon($('#metronome-btn'), [p2addr.metronomeStatus, p2addr.metronomeSwToggle]);
+        PP2_FRONT.initToggleIcon($('#accomp-part-btn'), [p2addr.sequencerPartSwAccomp, p2addr.sequencerAccompPartSwToggle]);
+        PP2_FRONT.initToggleIcon($('#left-part-btn'), [p2addr.sequencerPartSwLeft, p2addr.sequencerLeftPartSwToggle]);
+        PP2_FRONT.initToggleIcon($('#right-part-btn'), [p2addr.sequencerPartSwRight, p2addr.sequencerRightPartSwToggle]);
+        PP2_MIDI.addCallback(p2addr.allSongPlayMode, function(params) {playModeButtonHandler(params.value);});
+        playModeButton.on('click', PP2_CONTENTS.isSequencerOneSongRepeatAvailable() ? function() {
+            var nextMode = 1;
+            if ($(this).hasClass('on-order')) {
+                nextMode = 2;
+            } else if ($(this).hasClass('on-random')) {
+                nextMode = 3;
+            } else if ($(this).hasClass('on-onesong')) {
+                nextMode = 0;
+            }
+            PP2_MIDI.setAllSongPlayMode(nextMode);
+            playModeButtonHandler(nextMode);
+        } : function() {
+            var nextMode = 1;
+            if ($(this).hasClass('on-order')) {
+                nextMode = 2;
+            } else if ($(this).hasClass('on-random')) {
+                nextMode = 0;
+            }
+            PP2_MIDI.setAllSongPlayMode(nextMode);
+            playModeButtonHandler(nextMode);
+        });
+
+        PP2_MIDI.request([p2addr.sequencerPartSwAccomp,
+            p2addr.sequencerPartSwLeft,
+            p2addr.sequencerPartSwRight,
+            p2addr.metronomeStatus,
+            p2addr.allSongPlayMode]);
+
+        if (!PP2_CONTENTS.isSequencerPartSwitchAvailable()) {
+            $('#accomp-part-btn').hide();
+            $('#left-part-btn').hide();
+            $('#right-part-btn').hide();
+        }
+        if (PP2_MIDI.getAddressMapVersion() == 0) {
+            $('#play-mode-btn').hide();
+        }
+    });
+</script>
+
+<style type="text/css">
+</style>
+
+<script type="text/html" id="body">
+    <button id="metronome-btn" class="icbtn icbtn-metronome"></button>
+    <button id="accomp-part-btn" class="icbtn icbtn-accomp"></button>
+    <button id="left-part-btn" class="icbtn icbtn-lefthand"></button>
+    <button id="right-part-btn" class="icbtn icbtn-righthand"></button>
+    <button id="play-mode-btn" class="icbtn icbtn-playmode" style="margin-left: 30px;"></button>
+</script>

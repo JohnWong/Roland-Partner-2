@@ -1,0 +1,269 @@
+<!-- エディタ参照のみの用途 -->
+<head>
+    <link rel="stylesheet" type="text/css" href="../../bootstrap-3.3.6-dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" type="text/css" href="../../bootstrap-3.3.6-dist/css/bootstrap-theme.min.css" />
+    <link rel="stylesheet" type="text/css" href="../../animsition/css/animsition.min.css" />
+    <link rel="stylesheet" type="text/css" href="../../css/pp2.css" />
+</head>
+<!-- / -->
+
+<script type="text/javascript">
+    $(function() {
+        // 現在のキーボードモード
+        var keyboardMode = 0;
+        // 現在のトーン設定対象
+        var target = 0;
+        // 選択中のトーンカテゴリ
+        var selectedToneCategory;
+        // 選択中のトーン
+        var selectedTone;
+
+        var callbackKeys = [];
+        PP2_FRONT.scriptPool.toneSettingsIF = {
+            callbackKeys: callbackKeys
+        };
+
+        // 言語のコールバック
+        callbackKeys.push(PP2_MIDI.addCallback(p2addr.songToneLanguage, function(params) {
+            PP2_LANGUAGE.setSongToneLanguage(params.value);
+            PP2_MIDI.requestKeyboardMode();
+        }));
+        // キーボードモードのコールバック
+        callbackKeys.push(PP2_MIDI.addCallback(p2addr.keyBoardMode, function(params) {
+            keyboardMode = params.value;
+            var leftButton = $('#tone-target-btn-left');
+            var rightButton = $('#tone-target-btn-right');
+            if (PP2_CONTENTS.isKeyboardSettingAvailable()) {
+                $('#tone-target-btn-container').show();
+                $('#tone-left-top-margin').css('top', '65px');
+                $('#tone-right-top-margin').attr('height',  '112px');
+            }
+            switch (keyboardMode) {
+                case 0:
+                    $('#tone-target-btn-container').hide();
+                    $('#tone-left-top-margin').css('top', '0');
+                    $('#tone-right-top-margin').attr('height',  '47px');
+                    break;
+                case 2:
+                    leftButton.html(PP2_LANGUAGE.getValues().tone1);
+                    rightButton.html(PP2_LANGUAGE.getValues().tone2);
+                    break;
+                default:
+                    leftButton.html(PP2_LANGUAGE.getValues().left);
+                    rightButton.html(PP2_LANGUAGE.getValues().right);
+                    break;
+            }
+            switch (keyboardMode) {
+                case 1:
+                case 2:
+                    leftButton.removeAttr('disabled');
+                    rightButton.removeAttr('disabled');
+                    break;
+                default:
+                    leftButton.attr('disabled', true);
+                    rightButton.attr('disabled', true);
+                    break;
+            }
+            if (PP2_CORE.getCurrentApplicationMode() == PP2_CORE.applicationModes.Rhythm && keyboardMode == 1) {
+                // Rhythmでスプリットの場合は右しか設定出来ないように
+                leftButton.attr('disabled', true);
+                PP2_FRONT.scriptPool.selectToneTarget(1);
+            } else if (keyboardMode == 2) {
+                // デュアルのときは音色2をデフォルト選択
+                PP2_FRONT.scriptPool.selectToneTarget(1);
+            } else {
+                PP2_FRONT.scriptPool.selectToneTarget(0);
+            }
+        }));
+        // Single向けトーンのコールバック
+        callbackKeys.push(PP2_MIDI.addCallback(p2addr.toneForSingle, function(params) {
+            switch (keyboardMode) {
+                case 0:
+                case 3:
+                    reloadListByToneParams(params);
+                    break;
+                case 1:
+                    if (target == 1) {
+                        reloadListByToneParams(params);
+                    }
+                    break;
+                case 2:
+                    if (target == 0) {
+                        reloadListByToneParams(params);
+                    }
+                    break;
+            }
+        }));
+        // Split向けトーンのコールバック
+        callbackKeys.push(PP2_MIDI.addCallback(p2addr.toneForSplit, function(params) {
+            if (keyboardMode == 1 && target == 0) {
+                reloadListByToneParams(params);
+            }
+        }));
+        // Dual向けトーンのコールバック
+        callbackKeys.push(PP2_MIDI.addCallback(p2addr.toneForDual, function(params) {
+            if (keyboardMode == 2 && target == 1) {
+                reloadListByToneParams(params);
+            }
+        }));
+
+        // トーンセットの対象を指定します。
+        PP2_FRONT.scriptPool.selectToneTarget = function(value) {
+            target = value;
+            var buttons = $('#tone-target-btn-container').find('button');
+            _.forEach(buttons, function (v) {
+                $(v).removeClass('btn-primary').addClass('btn-default');
+            });
+            $(buttons[value]).removeClass('btn-default').addClass('btn-primary');
+
+            PP2_MIDI.request(p2addr.toneForSingle);
+            PP2_MIDI.request(p2addr.toneForSplit);
+            PP2_MIDI.request(p2addr.toneForDual);
+        };
+
+        // カテゴリーNoを元にトーンカテゴリを取得します。
+        var getToneCategoryByNo = function(toneCategoryNo) {
+            return PP2_CONTENTS.getToneList().category[toneCategoryNo];
+        };
+
+        // Noを元にトーンを取得します。
+        var getToneByNo = function(toneCategory, toneNo) {
+            return toneCategory.tone[toneNo];
+        };
+
+        // トーンカテゴリをリロードします。
+        var reloadToneCategories = function() {
+            var toneCategories = $('#tone-categories-table').find('tbody');
+            toneCategories.empty();
+            _.forEach(PP2_CONTENTS.getToneList().category, function (toneCategory) {
+                var tr = $('<tr />').on('click', function () {
+                    $(this).parent().find('.info').removeClass('info');
+                    $(this).addClass('info');
+                    selectedToneCategory = toneCategory;
+                    reloadTones(toneCategory);
+                });
+                var td = $('<td />').html(PP2_LANGUAGE.isSongToneLanguageJa() ? toneCategory.name_jp : toneCategory.name);
+                if (toneCategory.name == selectedToneCategory.name) {
+                    tr.addClass('info');
+                }
+                tr.append(td).appendTo(toneCategories);
+            });
+        };
+
+        // トーン一覧をリロードします。
+        var previousToneCategory;
+        var previousIsJa;
+        var reloadTones = function(toneCategory) {
+            var tones = $('#tones-table').find('tbody');
+            var tableContainer = tones.parent().parent();
+            if (previousToneCategory != toneCategory || previousIsJa != PP2_LANGUAGE.isSongToneLanguageJa()) {
+                tones.empty();
+                _.forEach(toneCategory.tone, function (tone) {
+                    var nameTd = $('<td />').html(tone.number + '.&nbsp;&nbsp;' + (PP2_LANGUAGE.isSongToneLanguageJa() ? tone.name_jp : tone.name));
+                    var tr = $('<tr />').on('click', function () {
+                        $(this).parent().find('.info').removeClass('info');
+                        $(this).addClass('info');
+                        setTone(tone);
+                    });
+                    tr.append(nameTd).appendTo(tones);
+                    if (tone.name == selectedTone.name) {
+                        tr.addClass('info');
+                        PP2_FRONT.scrollToTargetIfNeeded(tableContainer, tr);
+                    }
+                });
+            } else {
+                tones.find('.info').removeClass('info');
+                var tr = $(tones.find('tr')[_.findIndex(toneCategory.tone, selectedTone)]);
+                tr.addClass('info');
+                PP2_FRONT.scrollToTargetIfNeeded(tableContainer, tr);
+            }
+            previousToneCategory = toneCategory;
+            previousIsJa = PP2_LANGUAGE.isSongToneLanguageJa();
+        };
+
+        // MIDIのTone情報paramsを元にリストを再読み込みします。
+        var reloadListByToneParams = function(params) {
+            selectedToneCategory = getToneCategoryByNo(params.categoryNo);
+            selectedTone = getToneByNo(selectedToneCategory, params.number);
+            reloadToneCategories();
+            reloadTones(selectedToneCategory);
+        };
+
+        // トーンをセットします。
+        var setTone = function(tone) {
+            selectedTone = tone;
+            var toneCategoryNo = _.findIndex(PP2_CONTENTS.getToneList().category, {name: selectedToneCategory.name});
+            var toneNo = _.findIndex(selectedToneCategory.tone, {name: tone.name});
+            switch (keyboardMode) {
+                case 0:
+                case 3:
+                    // Whole/Twin
+                    PP2_MIDI.setToneForSingle(toneCategoryNo, toneNo);
+                    break;
+                case 1:
+                    // Split
+                    if (target == 0) {
+                        // LEFT
+                        PP2_MIDI.setToneForSplit(toneCategoryNo, toneNo);
+                    } else {
+                        // RIGHT
+                        PP2_MIDI.setToneForSingle(toneCategoryNo, toneNo);
+                    }
+                    break;
+                case 2:
+                    // Dual
+                    if (target == 0) {
+                        // TONE1
+                        PP2_MIDI.setToneForSingle(toneCategoryNo, toneNo);
+                    } else {
+                        // TONE2
+                        PP2_MIDI.setToneForDual(toneCategoryNo, toneNo);
+                    }
+                    break;
+            }
+        };
+
+        // コールバックを起動させる
+        if (PP2_CONTENTS.isLanguageSettingAvailable()) {
+            // 端末の言語設定がある場合、先に言語設定取得を試みる
+            PP2_MIDI.request(p2addr.songToneLanguage);
+        } else {
+            PP2_MIDI.requestKeyboardMode();
+        }
+
+        if (!PP2_CONTENTS.isKeyboardSettingAvailable()) {
+            $('#tone-target-btn-container').hide();
+            $('#tone-left-top-margin').css('top', '0');
+            $('#tone-right-top-margin').attr('height',  '47px');
+        }
+    });
+    //# sourceURL=parts/tone_settings.js
+</script>
+
+<style type="text/css">
+</style>
+
+<script type="text/html" id="body">
+    <div class="abs t0 b0 l0 border-right" style="width: 210px;">
+        <div id="tone-target-btn-container" class="abs multi" style="top: 20px;left: 13px;width: 174px;height: 37px;">
+            <button id="tone-target-btn-left" class="abs btn btn-default t0 l0 b0" style="width: 87px;" onclick="PP2_FRONT.scriptPool.selectToneTarget(0);"><lang key="left"></lang></button>
+            <button id="tone-target-btn-right" class="abs btn btn-default t0 b0 r0" style="width: 87px;" onclick="PP2_FRONT.scriptPool.selectToneTarget(1);"><lang key="right"></lang></button>
+        </div>
+        <div id="tone-left-top-margin" class="abs r0 b0 l0 scrollable" style="top: 65px;">
+            <table id="tone-categories-table" class="table data-table">
+                <thead>
+                <tr><th colspan="2" height="0"><lang key="tones"></lang></th></tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </div>
+    <div class="abs t0 r0 b0 scrollable" style="left: 210px;">
+        <table id="tones-table" class="table data-table" width="100%">
+            <thead>
+            <tr><th id="tone-right-top-margin" colspan="2" height="112px"></th></tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
+</script>

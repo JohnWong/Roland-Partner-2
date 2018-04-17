@@ -1,0 +1,258 @@
+<!-- エディタ参照のみの用途 -->
+<head>
+    <link rel="stylesheet" type="text/css" href="../bootstrap-3.3.6-dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" type="text/css" href="../bootstrap-3.3.6-dist/css/bootstrap-theme.min.css" />
+    <link rel="stylesheet" type="text/css" href="../animsition/css/animsition.min.css" />
+    <link rel="stylesheet" type="text/css" href="../css/pp2.css" />
+</head>
+<!-- / -->
+
+<script type="text/javascript">
+    $(function() {
+        var isActive = true;
+        PP2_CORE.init(PP2_CORE.applicationModes.Diary);
+
+        var activities = [];
+        var selectedDate = undefined;
+
+        PP2_RECORDER.startAutoRecording();
+
+        PP2_MIDI.addCallback(p2addr.eventsMidiDisconnected, function() {
+            PP2_CONTENTS.clear();
+            $('.modal').modal('hide');
+            PP2_FRONT.showModal('error_disconnected', 350);
+        });
+
+        PP2_FRONT.onUnload = function () {
+            isActive = false;
+            PP2_PLAYER.removeAllEventListeners();
+            PP2_RECORDER.removeAllEventListeners();
+            PP2_DB.removeAllEventListeners();
+        };
+
+        var getActivityWithDate = function(targetDate) {
+            activities = _.filter(activities, function(activity) {return JSON.stringify(activity) !== '{}';});
+            var activity = _.filter(activities, function (activity) {
+                var startAt = new Date(activity.startAt);
+                return targetDate.getFullYear() === startAt.getFullYear() && targetDate.getMonth() === startAt.getMonth() && targetDate.getDate() === startAt.getDate();
+            })[0];
+            if (undefined === activity) {
+                activity = {};
+                activities.push(activity);
+            }
+            return activity;
+        };
+
+        var currentOptions = undefined;
+        var calendar = $('#diary-calendar');
+        var refreshCalendar = function(options, onFinishedCallback) {
+            currentOptions = options;
+
+            calendar.empty().text('Loading');
+            PP2_DB_AWS_HANDLER.requestActivitiesOnMonth(options.year, options.month, function(items) {
+                activities = items;
+                var activeDates = [];
+
+                var refreshRightContentIfNeeed = function(targetDate) {
+                    selectedDate = targetDate;
+                    PP2_FRONT.loadPartsToElement($('#diary-right-content'), 'diary_right_content', function () {
+                        PP2_FRONT.scriptPool.diaryRightContentIF.setActivity(targetDate, getActivityWithDate(targetDate));
+                    });
+                };
+
+                _.forEach(activities, function(activity) {
+                    if (JSON.stringify(activity) === '{}') {
+                        return;
+                    }
+                    var startAt = new Date(activity.startAt);
+                    activeDates.push(new Date(startAt.getFullYear(), startAt.getMonth(), startAt.getDate()));
+                });
+                activeDates = _.uniq(activeDates);
+                options.cellClass = {
+                    'activity-exists': activeDates,
+                    selected: undefined !== selectedDate ? [selectedDate] : []
+                };
+                options.cellClick = function(event) {
+                    calendar.find('.selected').removeClass('selected');
+                    $(event.target).addClass('selected');
+                    refreshRightContentIfNeeed(event.data.date);
+                }
+                calendar.simpleCalendar(options);
+                if ('function' === typeof(onFinishedCallback)) {
+                    onFinishedCallback();
+                }
+            });
+        };
+
+        PP2_FRONT.scriptPool.diaryIF = {
+            refresh: function() {
+                refreshCalendar(currentOptions);
+            }
+        };
+
+        PP2_RECORDER.addEventListener({
+            onRecordFinished: function() {
+                PP2_FRONT.scriptPool.diaryIF.refresh();
+                if (undefined !== selectedDate && fecha.format(selectedDate, 'YYYYMMDD') === fecha.format(new Date(), 'YYYYMMDD')) {
+                    PP2_FRONT.scriptPool.diaryRightContentIF.setActivity(selectedDate, getActivityWithDate(selectedDate));
+                }
+            }
+        });
+
+        var now = new Date();
+        var currentRecordedSong = PP2_PLAYER.getCurrentRecordedSong();
+        var defaultCalendarDate = undefined !== currentRecordedSong && currentRecordedSong.isAutoRecorded ? new Date(currentRecordedSong.startAt) : now;
+        refreshCalendar({
+            year: defaultCalendarDate.getFullYear(),
+            month: defaultCalendarDate.getMonth() + 1,
+            firstDayOfTheWeek: PP2_DB.currentUser.calendarType,
+            tableClass: 'diary-calendar',
+            previousClick: function(options) {
+                refreshCalendar(options);
+                return false;
+            },
+            nextClick: function(options) {
+                refreshCalendar(options);
+                return false;
+            },
+            currentMonthFormatter: function(date) {
+                return $('<div />').append($('<span />').text(date.getFullYear() + '/' + ('0' + (date.getMonth() + 1)).slice(-2)))
+                    .append($('<button />').addClass('btn btn-default').text(PP2_LANGUAGE.getValues().today).on('click', function() {
+                        currentOptions.year = now.getFullYear();
+                        currentOptions.month = now.getMonth() + 1;
+                        refreshCalendar(currentOptions, function () {
+                            calendar.find('.today').trigger('click');
+                        });
+                    }));
+            }
+        }, function () {
+            if (undefined !== currentRecordedSong && currentRecordedSong.isAutoRecorded) {
+                calendar.find('.activity-exists').each(function() {
+                    if (parseInt($(this).text(), 10) === new Date(currentRecordedSong.startAt).getDate()) {
+                        $(this).trigger('click');
+                    }
+                });
+            } else {
+                calendar.find('.today').trigger('click');
+            }
+        });
+
+        PP2_DB.addEventListener({
+            'onUserChanged': function () {
+                PP2_FRONT.goTo(PP2_CORE.applicationModes.Diary);
+            }
+        });
+        PP2_FRONT.refreshUserIcon();
+
+        // 注意ダイアログ表示
+        if (PP2_CORE.isAndroid() && PP2_MIDI.isBlueTooth() && !PP2_SAVEDATA.data.rhythm.notShowRhythmNotificationDialogForAndroid) {
+            PP2_FRONT.showModal('rhythm_notification_dialog_for_android', 500, function(modal) {
+                modal.on('hidden.bs.modal', function () {
+                    if (!isActive) {
+                        // ページ自体が居ない場合は表示しない
+                        return;
+                    }
+                    // ユーザ登録推奨ダイアログ表示
+                    if (PP2_DB.currentUser.isGuest && !PP2_SAVEDATA.data.notShowGuestNotificationDialog) {
+                        PP2_FRONT.showModal('guest_notification_dialog', 500);
+                    }
+                });
+            });
+        } else if (PP2_DB.currentUser.isGuest && !PP2_SAVEDATA.data.notShowGuestNotificationDialog) {
+            PP2_FRONT.showModal('guest_notification_dialog', 500);
+        }
+    });
+    //# sourceURL=dialogs/diary.js
+</script>
+
+<style type="text/css">
+    #diary-calendar {
+        border-right: solid 1px #BFC0C1;
+    }
+    TABLE.diary-calendar {
+        width: 100%;
+        background-color: white;
+        border-collapse: separate;
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 20px;
+        color: #5A5B5C;
+    }
+    TABLE.diary-calendar DIV.controller {
+        position: relative;
+    }
+    TABLE.diary-calendar DIV.controller .current button {
+        margin-left: 10px;
+        margin-top: -3px;
+    }
+    TABLE.diary-calendar DIV.controller .prev, TABLE.diary-calendar DIV.controller .next {
+        bottom: auto;
+    }
+    TABLE.diary-calendar DIV.current {
+        font-size: 20px;
+    }
+    TABLE.diary-calendar DIV.prev {
+        cursor: pointer;
+        position: absolute;
+        left: 3px;
+        bottom: 0px;
+    }
+    TABLE.diary-calendar DIV.next {
+        cursor: pointer;
+        position: absolute;
+        right: 3px;
+        bottom: 0px;
+    }
+    TABLE.diary-calendar TR TH {
+        text-align: center;
+        width: 60px;
+        height: 25px;
+        font-size: 12px;
+    }
+    TABLE.diary-calendar TR TD {
+        text-align: center;
+        width: 60px;
+        height: 55px;
+        border: solid 2px transparent;
+        border-radius: 13px;
+    }
+    TABLE.diary-calendar TR TD.saturday {
+        color: #0000ff;
+    }
+
+    TABLE.diary-calendar TR TD.sunday, TABLE.diary-calendar TR TD.holiday {
+        color: #ff0000;
+    }
+    TABLE.diary-calendar TR TD.today {
+        font-weight: bold;
+        border: solid 2px #F37321;
+    }
+    TABLE.diary-calendar TR TD.selected {
+        background-color: rgba(243,115,33,0.5);
+        cursor: pointer;
+    }
+    TABLE.diary-calendar TR TD.inactive {
+        color: #EEEEEE;
+    }
+    TABLE.diary-calendar TR TD.activity-exists {
+        background-image: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACgAAAAoCAYAAACM/rhtAAACUUlEQVRYR9WZP2hTURTGv+81yaCmhU6CBZO0oyBYl65OFZycFAcHB/9sySsIpmMrCL5k88/g4CDt1EnQybWDtlBwbGOFipkKzauCSXuP3NhX2mefzX28V28yJvd85/fOue/cc0+IGJ/Nh6WhXFtNCDkO8oJQxigYATC8J7cpxAaFqxD5TJGlds5ZHH7S2DJ1RxOD1tT5CYpzDcJJUC6Z2EK4DMp7oXo7+PTrYq+2PQH+cEfHd7F7i+BNAGd7FY9Y1xTI3AAG3pz21paO0/onoADcrpTugXIXwMXjxAx/X4Hw5Zla4wUBibKNBPxZHjm342RcgmVDx0bLBVLPqB3vVH3j21GGRwJulUfH6KhpAreNvMVcLMBrUc7MUH1tNSzxF+CfyGVnTwouANKQGdWphiN5CFDvOd8teGmnNSrQOt15b909uCcPAfqV0n1QnsXMVDJmwgf5WuN5ILYPqEuJgnqVwttqCr7iwLkTlKB9wJZbqP2v1IafQKd60Fuv6O+7gHsnxEICRdg0WlHrm0J1XZ84XUDfLc4CeJSUekI6j/Pelyr1wZ/t4IPx2ZoQRaSMcLmTxRVulwuT4vBd2v7i6FPJVfqVYhXETByB1G0E0/Td0hwgN1J3FssB59maKn6k4HIs+5SNhPhE3y1+t6i8hB+5qQF/AcilHIy48u2+ALQ7xX3wklheZqwv1NYfddY3C9a3W33RsHYhbW75NaD1l6buXrT52qkBrb+4a0irRx9BT2T18CiAtHr8FkBaPcA82AJbOwIO9+nWDtHDoCf5N8Rvji9P3pjfH2gAAAAASUVORK5CYII=');
+        background-position: center center;
+        background-repeat: no-repeat;
+        color: white;
+    }
+</style>
+
+<script type="text/html" id="header">
+    <div id="header-left" class="float-left"></div>
+    <div class="float-right">
+        <button class="user-button icbtn icbtn-user" onclick="PP2_FRONT.showModal('users', 420);">&nbsp;</button>
+        <button class="icbtn icbtn-remotecontroller" onclick="PP2_FRONT.showRightModal('settings_handler', 1000);">&nbsp;</button>
+    </div>
+</script>
+
+<script type="text/html" id="body">
+    <div id="diary-calendar" class="abs t0 b0 l0" style="width: 420px;"></div>
+    <div id="diary-right-content" class="abs t0 b0 r0" style="width: calc(100% - 420px);"></div>
+</script>
+
+<script type="text/html" id="footer">
+</script>

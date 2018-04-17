@@ -1,0 +1,51 @@
+<script type="text/javascript">
+    $(function() {
+        $("#tryAgainBtn").attr('disabled', true);
+        var timer;
+        var random = function(){
+            timer = setTimeout(function(){
+                PP2_FRONT.scriptPool.setRandomPoint($("#flash-card-score"));
+                random();
+            }, 100);
+        }
+        random();
+        setTimeout(function(){
+            clearTimeout(timer);
+            PP2_FRONT.scriptPool.setScoreComment($("#comment"));
+            PP2_FRONT.scriptPool.setTotalPoint($("#flash-card-score"));
+            $("#tryAgainBtn").removeAttr('disabled');
+            $("#tryAgainBtn").addClass('positive');
+        }, 3000);
+    });
+</script>
+
+<style type="text/css">
+    #flash-card-score-container {
+        text-align: center;
+    }
+    #flash-card-score {
+        font-size: 100px;
+        color: #F37321;
+    }
+    #flash-card-score-suffix {
+        font-size: 30px;
+        color: #F37321;
+    }
+</style>
+
+<script type="text/html" id="header">
+    <span id="comment"><lang key="flashcard_check"/></span>
+</script>
+
+<script type="text/html" id="body">
+    <div id="flash-card-score-container">
+        <span id="flash-card-score"></span>
+        <span id="flash-card-score-suffix"><lang key="flashcard_point"/></span>
+    </div>
+</script>
+
+<script type="text/html" id="footer">
+    <div>
+        <button type="button" id="tryAgainBtn" class="btn btn-default" data-dismiss="modal" onclick="PP2_FRONT.scriptPool.showFirstDialog();"><lang key="flashcard_try_again"/></button>
+    </div>
+</script>

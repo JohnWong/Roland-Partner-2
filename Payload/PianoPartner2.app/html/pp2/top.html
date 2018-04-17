@@ -1,0 +1,171 @@
+<script type="text/javascript">
+    $(function() {
+        var topContainer = $('#top-container');
+        if (topContainer.height() < 648) {
+            topContainer.css({
+                'transform-origin': '50% 0%',
+                transform: _.sprintf('scale(%f)', Math.min(1, topContainer.height() / 648 * 1.05))
+            });
+        }
+
+        // 隠しボタンセットアップ
+        var secretButtonHoldTimer;
+        var secretButtonHoldCount = 0;
+        var secretButtonTouchStartAction = function() {
+            secretButtonHoldCount++;
+            console.log('secretButtonHoldCount: ' + secretButtonHoldCount);
+            if (secretButtonHoldCount >= 2) {
+                secretButtonHoldTimer = setTimeout(function () {
+                    PP2_FRONT.showRightModal('connection_logs', 600);
+                }, 3000);
+            }
+        };
+        var secretButtonTouchEndAction = function() {
+            secretButtonHoldCount--;
+            clearTimeout(secretButtonHoldTimer);
+        };
+        $('#title-image').unbind('touchstart touchend touchcancel');
+        $('#title-image').bind('touchstart', secretButtonTouchStartAction);
+        $('#title-image').bind('touchend touchcancel', secretButtonTouchEndAction);
+        $('#footer-secret-button').unbind('touchstart touchend touchcancel');
+        $('#footer-secret-button').bind('touchstart', secretButtonTouchStartAction);
+        $('#footer-secret-button').bind('touchend touchcancel', secretButtonTouchEndAction);
+
+        PP2_CORE.init(PP2_CORE.applicationModes.Top);
+        var showLoadingTimer = setTimeout(function() {PP2_FRONT.showLoading(true);}, 100);
+        PP2_DB_AWS_HANDLER.autoChangeUserAndLoginIfNeeded(function() {
+            clearTimeout(showLoadingTimer);
+            PP2_FRONT.hideLoading();
+            // MIDI状態更新時の処理
+            var hideTimer;
+            var midiConnectStatusChangedCallback = function () {
+                hideTimer = setTimeout(PP2_FRONT.hideLoading, 1000);
+                if (PP2_MIDI.isConnected()) {
+                    $('#ble-connect-icon').animate({opacity: 1}, 500);
+                    $('#ble-connect-message').html(_.sprintf(PP2_LANGUAGE.getValues().connected_to_format, PP2_MIDI.getMIDIDeviceName())).animate({opacity: 1}, 500);
+                    $('.topbtn-container').find('button').removeAttr('disabled');
+                    PP2_MIDI.sendApplicationMode(PP2_CORE.applicationModes.Top, 1);
+                    PP2_RECORDER.startAutoRecording();
+                } else {
+                    $('#ble-connect-icon').animate({opacity: 0}, 500);
+                    $('#ble-connect-message').animate({opacity: 0}, 500, function () {
+                        if (!PP2_MIDI.isConnected()) {
+                            $('#ble-connect-message').html('');
+                        }
+                    });
+                    $('#top-btn-digiscorelight').attr('disabled', true);
+                    $('#top-btn-rhythm').attr('disabled', true);
+                    $('#top-btn-songs').attr('disabled', true);
+                    $('#top-btn-remotecontroller').attr('disabled', true);
+                    $('#top-btn-recorder').attr('disabled', true);
+                    $('#top-btn-diary').attr('disabled', true);
+                    PP2_RECORDER.stopAutoRecording();
+                }
+            };
+
+            PP2_MIDI.addCallback(p2addr.eventsMidiStartConnect, function (endpoint) {
+                // 古いhide命令が残っている場合があるのでクリア
+                clearTimeout(hideTimer);
+                PP2_FRONT.showLoading(PP2_LANGUAGE.getValues().connecting_to_format);
+            });
+            PP2_MIDI.addCallback(p2addr.eventsMidiConnected, function () {
+                PP2_MIDI.sendConnection(1);
+                midiConnectStatusChangedCallback();
+            });
+            PP2_MIDI.addCallback(p2addr.eventsMidiConnectFailed, midiConnectStatusChangedCallback);
+            PP2_MIDI.addCallback(p2addr.eventsMidiDisconnected, function () {
+                PP2_CONTENTS.clear();
+                setTimeout(function () {
+                    if (!PP2_MIDI.isConnected()) {
+                        // 接続検知後別ピアノに自動接続する場合があるので、少し待ってから未接続のままであればダイアログを出す
+                        _.forEach(PP2_FRONT.getShowingModalNames(), function (name) {
+                            if (name.substr(0, 5) !== 'error' && !_.contains(['connection_logs', 'initialize_correct', 'initialize_incorrect'], name)) {
+                                PP2_FRONT.hideModal(name);
+                            }
+                        });
+                        PP2_CONTENTS.clear();
+                        if (PP2_FRONT.getShowingModalNames().length === 0) {
+                            PP2_FRONT.showModal('error_disconnected', 350);
+                        }
+                    }
+                }, 300);
+                midiConnectStatusChangedCallback();
+            });
+
+            PP2_FRONT.onUnload = function () {
+                PP2_MIDI.isAutoConnectable = false;
+                PP2_DB.removeAllEventListeners();
+            };
+
+            midiConnectStatusChangedCallback();
+
+            // 自動コネクト
+            PP2_MIDI.isAutoConnectable = true;
+            PP2_MIDI.autoConnectIfPossible();
+
+            PP2_DB.addEventListener({
+                'onUserChanged': function () {
+                    PP2_FRONT.goTo(PP2_CORE.applicationModes.Top);
+                }
+            });
+            PP2_FRONT.refreshUserIcon();
+
+            console.log('Backup start.');
+            PP2_DB_AWS_HANDLER.backupDataIfPossible(function () {
+                console.log('Backup completed.');
+                PP2_DB.deleteOldData(function () {
+                    console.log('Old data deleted.');
+                    // 端末の残り容量を確認して、少なかったらアラート表示
+                    PP2_CORE.getDeviceFreeSize(function (params) {
+                        var size = params.size;
+                        if (size > -1 && size < 100) {
+                            PP2_FRONT.alert(PP2_LANGUAGE.getValues().device_storage_notification_message);
+                        }
+                    });
+                });
+            });
+
+            console.log('Send to NCMB start.');
+            PP2_DB.sendToNCMB(function () {
+                console.log('Send to NCMB completed.');
+            });
+        });
+    });
+</script>
+
+<style type="text/css">
+    #top-container {
+        height: 100%;
+    }
+</style>
+
+<script type="text/html" id="header">
+    <div class="float-left">
+    </div>
+    <div class="float-right">
+        <button class="user-button icbtn icbtn-user" onclick="PP2_FRONT.showModal('users', 420);">&nbsp;</button>
+        <button class="icbtn icbtn-info" onclick="PP2_FRONT.showRightModal('information', 400)">&nbsp;</button>
+        <button class="icbtn icbtn-cog" onclick="PP2_FRONT.showRightModal('settings', 520)">&nbsp;</button>
+    </div>
+</script>
+
+<script type="text/html" id="body">
+    <div id="top-container">
+        <div class="row" style="height: 7.9%;"></div>
+        <div class="row" style="height: 39px;">
+            <img id="title-image" src="./images/img_title.png" />
+        </div>
+        <div class="row" style="height: 10%;"></div>
+        <div class="row topbtn-container">
+            <div>
+                <div><button class="topbtn" id="top-btn-songs" onclick="PP2_FRONT.goTo(PP2_CORE.applicationModes.Songs);"><img src="./images/btn_songs.png" /></button><br /><lang key="songs"></lang></div>
+                <div><button class="topbtn" id="top-btn-digiscorelight" onclick="PP2_FRONT.goTo(PP2_CORE.applicationModes.DigiScoreLite);"><img src="./images/btn_digiscore.png" /></button><br /><lang key="digiscorelite"></lang></div>
+                <div><button class="topbtn" id="top-btn-rhythm" onclick="PP2_FRONT.goTo(PP2_CORE.applicationModes.Rhythm);"><img src="./images/btn_rhythm.png" /></button><br /><lang key="rhythm"></lang></div>
+                <div><button class="topbtn" id="top-btn-flashcard" onclick="PP2_FRONT.goTo(PP2_CORE.applicationModes.FlashCard);"><img src="./images/btn_flashcard.png" /></button><br /><lang key="flashcard"></lang></div>
+                <div><button class="topbtn" id="top-btn-remotecontroller" onclick="PP2_FRONT.showRightModal('settings_handler', 1000);"><img src="./images/btn_remotecontroller.png" /></button><br /><lang key="remote_controller"></lang></div>
+                <div><button class="topbtn" id="top-btn-recorder" onclick="PP2_FRONT.goTo(PP2_CORE.applicationModes.Recorder);"><img src="./images/btn_recorder.png" /></button><br /><lang key="recorder"></lang></div>
+                <div><button class="topbtn" id="top-btn-diary" onclick="PP2_FRONT.goTo(PP2_CORE.applicationModes.Diary);"><img src="./images/btn_diary.png" /></button><br /><lang key="diary"></lang></div>
+            </div>
+        </div>
+    </div>
+</script>

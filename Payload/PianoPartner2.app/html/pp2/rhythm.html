@@ -1,0 +1,455 @@
+<!-- エディタ参照のみの用途 -->
+<head>
+    <link rel="stylesheet" type="text/css" href="../bootstrap-3.3.6-dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" type="text/css" href="../bootstrap-3.3.6-dist/css/bootstrap-theme.min.css" />
+    <link rel="stylesheet" type="text/css" href="../animsition/css/animsition.min.css" />
+    <link rel="stylesheet" type="text/css" href="../css/pp2.css" />
+</head>
+<!-- / -->
+
+<script type="text/javascript">
+    $(function() {
+        var styleLogTimer;
+
+        PP2_CORE.init(PP2_CORE.applicationModes.Rhythm);
+
+        PP2_PLAYER.pause();
+        PP2_RECORDER.startAutoRecording();
+
+        // ライフサイクルのコールバック
+        PP2_FRONT.onApplicationStop = function() {
+            if (isArrangerPlaying) {
+                PP2_ARRANGER.stop();
+            }
+            PP2_MIDI.stopSequencerAndMetronomeIfNeeded();
+        };
+        PP2_FRONT.onUnload = function() {
+            PP2_ARRANGER.stop();
+            PP2_ARRANGER.setSyncStart(false);
+            // ペダルモードをOFFに
+            PP2_ARRANGER.setRhythmStartStopPedalMode(0);
+            clearInterval(divisionTimer);
+            clearTimeout(styleLogTimer);
+            PP2_CORE.removeNotSleepTag('rhythm');
+        };
+
+        // Intro/Endingボタンのステータスポーリング
+        var introButton = $('#arranger-intro-btn');
+        var endingButton = $('#arranger-ending-btn');
+        PP2_CORE.nativeCallbacks[PP2_CORE.nativeMethods.arranger.requestDivision] = function(divisions) {
+            introButton.removeClass('btn-primary').addClass('btn-default');
+            endingButton.removeClass('btn-primary').addClass('btn-default');
+            if (divisions.current == 1 || divisions.next == 1) {
+                introButton.removeClass('btn-default').addClass('btn-primary');
+            }
+            if (divisions.current == 2 || divisions.next == 2) {
+                endingButton.removeClass('btn-default').addClass('btn-primary');
+            }
+        };
+        var divisionTimer = setInterval(function() {
+            PP2_ARRANGER.requestDivision();
+        }, PP2_CORE.isAndroid() ? 500 : 100);
+
+        PP2_MIDI.addCallback(p2addr.eventsMidiDisconnected, function() {
+            PP2_CONTENTS.clear();
+            $('.modal').modal('hide');
+            PP2_FRONT.showModal('error_disconnected', 350);
+        });
+
+        PP2_MIDI.addCallback(p2addr.keyBoardMode, function(params) {
+            PP2_ARRANGER.resetChordRecognitionType(params.value);
+        });
+
+        var isArrangerPlaying = false;
+
+        var updateVariationButtons = function(variation) {
+            var buttons = $('#arranger-variation-container').find('button');
+            buttons.removeClass('btn-primary').addClass('btn-default');
+            $(buttons[variation > 0 ? 1 : 0]).removeClass('btn-default').addClass('btn-primary');
+        };
+
+        var updateAutoFillButtons = function(value) {
+            var buttons = $('#arranger-auto-fill-container').find('button');
+            buttons.removeClass('btn-primary').addClass('btn-default');
+            $(buttons[value ? 1 : 0]).removeClass('btn-default').addClass('btn-primary');
+        };
+
+        var updateSyncStartButtons = function(syncStart) {
+            var buttons = $('#arranger-sync-start-container').find('button');
+            buttons.removeClass('btn-primary').addClass('btn-default');
+            $(buttons[syncStart ? 1 : 0]).removeClass('btn-default').addClass('btn-primary');
+        };
+
+        var addTempo = function(diff) {
+            var baseTempo = $('#tempo').html();
+            PP2_ARRANGER.setTempo(parseInt(baseTempo, 10) + diff);
+            PP2_ARRANGER.requestTempo();
+        };
+
+        var setupTempoButton = function(element, appendAmount)
+        {
+            var touching = false;
+            var keepAction = function() {
+                if (!touching) {
+                    return;
+                }
+                addTempo(appendAmount);
+                // リピートは100ms毎
+                setTimeout(keepAction, 100);
+            };
+            element.on('touchstart', function() {
+                addTempo(appendAmount);
+                touching = true;
+                // 700ms後にリピート開始
+                setTimeout(keepAction, 700);
+            });
+            element.on('touchend', function() {
+                touching = false;
+            });
+            element.on('touchcancel', function() {
+                touching = false;
+            });
+        };
+        setupTempoButton($('#rhythm-tempo-down-btn'), -1);
+        setupTempoButton($('#rhythm-tempo-up-btn'), 1);
+        if (PP2_CONTENTS.isSequencerTempoExpansion()) {
+            $('#tempo').addClass('clickable btn btn-default');
+            $('#tempo').parent().removeClass('tempo-container');
+            $('#tempo').on('click', function() {
+                PP2_FRONT.showModal('rhythm_tempo_settings', 500);
+            });
+        }
+
+        var startStyleLogTimer = function() {
+            clearTimeout(styleLogTimer);
+            var currentArrangerFile = PP2_FRONT.global.arrangerFile;
+            styleLogTimer = setTimeout(function() {
+                if (currentArrangerFile != PP2_FRONT.global.arrangerFile) {
+                    // 別のスタイルが選択された場合はログ送信キャンセル
+                    return;
+                }
+                PP2_ARRANGER.sendStyleLog(currentArrangerFile);
+            }, 15000);
+        };
+
+        // ドラムのみ
+        PP2_CORE.nativeCallbacks[PP2_CORE.nativeMethods.arranger.requestOnlyDrums] = function(isOnlyDrums) {
+            if (isOnlyDrums) {
+                $('#only-drums-button').removeClass('btn-default').addClass('btn-primary');
+            } else {
+                $('#only-drums-button').removeClass('btn-primary').addClass('btn-default');
+            }
+        };
+
+        // 関数定義
+        PP2_FRONT.scriptPool = {
+            // STYLES一覧を更新します。
+            refleshStyles: function(styleFiles) {
+                if (undefined == styleFiles['category']) {
+                    return;
+                }
+                if (!PP2_FRONT.global.arrangerFile) {
+                    var defaultStyle = styleFiles.category[0].style[0];
+                    PP2_ARRANGER.setFile(defaultStyle.filename);
+                    PP2_FRONT.global.arrangerFile = defaultStyle.filename;
+                    PP2_FRONT.global.arrangerDefaultTempo = defaultStyle.tempo;
+                }
+
+                var tableContainer = $('#styles').parent();
+                var tbody = $('#styles').find('tbody');
+                tbody.empty();
+                var stlNo = 1;
+                _.forEach(styleFiles.category[0].style, function(v) {
+                    var tr = $('<tr />').attr({file: v.filename, tempo: v.tempo}).on('click', function() {
+                        $(this).parent().find('.info').removeClass('info');
+                        $(this).addClass('info');
+                        PP2_ARRANGER.setFile($(this).attr('file'));
+                        PP2_FRONT.global.arrangerFile = $(this).attr('file');
+                        PP2_FRONT.global.arrangerDefaultTempo = parseInt($(this).attr('tempo'), 10);
+                        if (isArrangerPlaying) {
+                            startStyleLogTimer();
+                        }
+                    }).appendTo(tbody);
+                    $('<td />').html('<div class="nowrap">' + (stlNo++) + '.&nbsp;&nbsp;' + (PP2_LANGUAGE.isSongToneLanguageJa() ? v.name_jp : v.name) + '</div>').appendTo(tr);
+                    $('<td />').html(v.beat_numerator + '/' + v.beat_denominator).appendTo(tr);
+                    $('<td />').html(v.bpm).css('text-align', 'right').appendTo(tr);
+                    if (v.filename == PP2_FRONT.global.arrangerFile) {
+                        tr.addClass('info');
+                    }
+                });
+                // チラつくので非同期で実行
+                setTimeout(function() {
+                    var tr = tbody.find('.info');
+                    PP2_FRONT.scrollToTargetIfNeeded(tableContainer, tr);
+                }, 0);
+            },
+            toggleStartStop: function() {
+                if (isArrangerPlaying) {
+                    PP2_ARRANGER.stop();
+                    clearTimeout(styleLogTimer);
+                } else {
+                    PP2_ARRANGER.start();
+                    startStyleLogTimer();
+                }
+            },
+            toggleOnlyDrums: function() {
+                PP2_ARRANGER.toggleOnlyDrums();
+                PP2_ARRANGER.requestOnlyDrums();
+            },
+            setVariation: function(variation) {
+                PP2_ARRANGER.setVariation(variation);
+                PP2_FRONT.global.arrangerVariation = variation;
+                updateVariationButtons(variation);
+            },
+            setAutoFill: function(value) {
+                PP2_ARRANGER.setAutoFill(value);
+                PP2_FRONT.global.arrangerAutoFill = value;
+                updateAutoFillButtons(value);
+            },
+            setSyncStart: function(onOrOff) {
+                PP2_ARRANGER.setSyncStart(onOrOff);
+                updateSyncStartButtons(onOrOff);
+            }
+        };
+
+        // コールバック定義
+        PP2_MIDI.addCallback(p2addr.songToneLanguage, function(params) {
+            PP2_LANGUAGE.setSongToneLanguage(params.value);
+            PP2_ARRANGER.requestFileList();
+        });
+        PP2_CORE.nativeCallbacks[PP2_CORE.nativeMethods.arranger.requestFileList] = function(styleFiles) {
+            PP2_FRONT.scriptPool.refleshStyles(styleFiles);
+        };
+        PP2_CORE.nativeCallbacks[PP2_CORE.nativeMethods.arranger.requestTempo] = function(tempo) {
+            $('#tempo').html(tempo);
+            if ('object' === typeof(PP2_FRONT.scriptPool.rhythmTempoSettingsIF)) {
+                PP2_FRONT.scriptPool.rhythmTempoSettingsIF.onTempoChanged(tempo);
+            }
+        };
+        PP2_CORE.nativeCallbacks[PP2_CORE.nativeMethods.arranger.requestCode] = function(code) {
+            var span =  $('#rhythm-code').find('span');
+            span.css('font-size', Math.min(30, 1.85 * $('#rhythm-code').width() / code.length) + 'px');
+            span.html(code);
+        };
+        PP2_CORE.nativeCallbacks[PP2_CORE.nativeMethods.arranger.requestPlayStatus] = function(isPlaying) {
+            isArrangerPlaying = isPlaying;
+            if (isPlaying) {
+                $('#start-button').html(PP2_LANGUAGE.getValues().stop).removeClass('btn-default').addClass('btn-primary');
+                PP2_CORE.addNotSleepTag('rhythm');
+            } else {
+                $('#start-button').html(PP2_LANGUAGE.getValues().start).removeClass('btn-primary').addClass('btn-default');
+                PP2_CORE.removeNotSleepTag('rhythm');
+            }
+        };
+
+        if (PP2_CONTENTS.isLanguageSettingAvailable()) {
+            PP2_MIDI.request(p2addr.songToneLanguage);
+        } else {
+            PP2_ARRANGER.requestFileList();
+        }
+        PP2_ARRANGER.requestTempo();
+        PP2_ARRANGER.requestCode();
+        PP2_ARRANGER.requestPlayStatus();
+        PP2_ARRANGER.requestOnlyDrums();
+        PP2_MIDI.request(p2addr.keyBoardMode);
+        // ペダルモード送信
+        PP2_ARRANGER.setRhythmStartStopPedalMode(PP2_SAVEDATA.data.rhythm.pedalMode);
+        PP2_MIDI.setArrangerPedalMode(PP2_SAVEDATA.data.rhythm.pedalMode);
+
+        // バランス設定送信
+        PP2_MIDI.setArrangerBalance(PP2_FRONT.global.arrangerBalance);
+
+        updateVariationButtons(PP2_FRONT.global.arrangerVariation);
+        updateAutoFillButtons(PP2_FRONT.global.arrangerAutoFill);
+
+        if (!PP2_CONTENTS.isKeyboardSettingAvailable()) {
+            $('.icbtn-keyboard').remove();
+        }
+
+        // 基準サイズは286px、余白は上から40px 40px 40px
+        var upperContainerMinimumHeight = 286 - 40 - 40 - 40;
+        var upperContainer = $('.rhythm-upper-container');
+        var upperContainerUsableSpace = Math.max(upperContainer.height() - upperContainerMinimumHeight, 0);
+        upperContainer.children('div').first().css({top: (upperContainerUsableSpace / 3) + 'px'});
+        upperContainer.children('button').first().css({top: (upperContainerUsableSpace / 3 + 25) + 'px'});
+        upperContainer.children('div').last().css({bottom: (upperContainerUsableSpace / 3) + 'px'});
+
+        // 基準サイズは324px、余白は上から40px 50px 50px
+        var underContainerMinimumHeight = 324 - 40 - 50 - 50;
+        var underContainer = $('.rhythm-under-container');
+        var underContainerUsableSpace = Math.max(underContainer.height() - underContainerMinimumHeight, 0);
+        underContainer.children('div').first().css({top: (underContainerUsableSpace / 140 * 40) + 'px'});
+        underContainer.children('div').last().css({bottom: (underContainerUsableSpace / 140 * 50) + 'px'});
+
+        // 注意ダイアログ表示
+        if (PP2_CORE.isAndroid() && PP2_MIDI.isBlueTooth() && !PP2_SAVEDATA.data.rhythm.notShowRhythmNotificationDialogForAndroid) {
+            PP2_FRONT.showModal('rhythm_notification_dialog_for_android', 500);
+        }
+    });
+</script>
+
+<style type="text/css">
+    #rhythm-code, .tempo-container {
+        background-color: #EFF0F1;
+        border: solid 1px #BFC0C1;
+        border-radius: 5px;
+    }
+    #rhythm-code div {
+        position: relative;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        display: table;
+    }
+    #rhythm-code div span {
+        position: absolute;
+        display: table-cell;
+        width: 100%;
+        height: 100%;
+        line-height: 95px;
+        font-size: 30px;
+        text-align: center;
+    }
+    #tempo {
+        font-size: 22px;
+        display: inline-block;
+        width: calc(100% - 166px);
+        height: 70px;
+    }
+    #tempo.clickable {
+        top: -1px;
+        left: 83px;
+        position: absolute;
+        border: solid 1px #BFC0C1;
+        border-radius: 4px;
+        background: white;
+    }
+    .content button.btn {
+        width: 120px;
+        height: 60px;
+    }
+    #start-button, #only-drums-button {
+        height: 70px;
+    }
+    #start-button.btn-default, #only-drums-button.btn-default {
+        background: white;
+        font-size: 22px;
+    }
+    #start-button.btn-default {
+        border: solid 1px #F37321;
+        color: #F37321;
+    }
+    #start-button.btn-primary, #only-drums-button.btn-primary {
+        border: solid 1px #F37321;
+        background: #F37321;
+        color: white;
+        font-size: 22px;
+    }
+    #rhythm-tempo-down-btn, #rhythm-tempo-up-btn {
+        top: -1px;
+        width: 70px;
+        height: 70px;
+        border: solid 1px #BFC0C1;
+        border-radius: 4px;
+        background: white;
+    }
+    #rhythm-tempo-down-btn img, #rhythm-tempo-up-btn img {
+        display: block;
+        margin-left: auto;
+        margin-right: auto;
+    }
+    .nowrap {
+        padding: 0;
+        white-space:nowrap;
+        overflow:hidden;
+    }
+    .rhythm-upper-container {
+        position: absolute;
+        top: 0;
+        right: 0;
+        left: 0;
+        height: 47%;
+        background: #E1E2E3;
+        border-bottom: solid 1px #BFC0C1;
+    }
+    .rhythm-under-container {
+        position: absolute;
+        right: 0;
+        bottom: 0;
+        left: 0;
+        height: 53%;
+    }
+</style>
+
+<script type="text/html" id="header">
+    <div class="float-right">
+        <button class="icbtn icbtn-cog" onclick="PP2_FRONT.showRightModal('rhythm_settings', 400)"></button>
+        <button class="icbtn icbtn-remotecontroller" onclick="PP2_FRONT.showRightModal('settings_handler', 1000);"></button>
+    </div>
+</script>
+
+<script type="text/html" id="body">
+    <div class="abs t0 r0 l0 titlebar"><lang key="rhythm_title"></lang></div>
+    <div class="abs r0 l0 b0" style="top: 40px;background: white;">
+        <div class="abs t0 b0 l0 border-right scrollable" style="width: 400px;">
+            <table class="table data-table" id="styles">
+                <thead>
+                <tr>
+                    <th><lang key="style"></lang></th>
+                    <th style="padding-left: 5px;padding-right: 5px;text-align: center;"><lang key="beat"></lang></th>
+                    <th style="padding-left: 5px;padding-right: 5px;text-align: center;"><lang key="bpm"></lang></th>
+                </tr>
+                </thead>
+                <tbody>
+                </tbody>
+            </table>
+        </div>
+        <div class="abs t0 r0 b0" style="left: 400px;">
+            <div class="rhythm-upper-container">
+                <div class="abs" style="top: 40px;right: 220px;left: 40px;height: 95px;white-space: nowrap;" id="rhythm-code"><div><span></span></div></div>
+                <button id="only-drums-button" class="btn btn-default abs" style="width: 140px;top: 65px;right: 40px;height: 70px;" onclick="PP2_FRONT.scriptPool.toggleOnlyDrums();"><lang key="only_drums"></lang></button>
+                <div class="abs" style="right: 40px;bottom: 40px;left: 40px;height: 70px;">
+                    <div class="abs t0 b0 l0 tempo-container" style="right: 270px;">
+                        <button id="rhythm-tempo-down-btn" class="abs btn btn-default icbtn icbtn-minus l0"><img src="images/icon_minus.png" /></button>
+                        <span id="tempo" style="line-height: 70px;padding: 0;">120</span>
+                        <button id="rhythm-tempo-up-btn" class="abs btn btn-default icbtn icbtn-plus r0"><img src="images/icon_plus.png" /></button>
+                    </div>
+                    <button id="start-button" class="btn btn-default abs t0 r0 b0" style="width: 230px;" onclick="PP2_FRONT.scriptPool.toggleStartStop();"><lang key="start"></lang></button>
+                </div>
+            </div>
+            <div class="rhythm-under-container">
+                <div class="abs" style="top: 40px;right: 40px;left: 40px;height: 90px;">
+                    <div class="abs t0 l0 b0" style="width: 240px;">
+                        <div style="height: 30px;"><lang key="variation"></lang></div>
+                        <div style="height: 60px;" class="multi" id="arranger-variation-container">
+                            <button class="btn btn-lg btn-primary" onclick="PP2_FRONT.scriptPool.setVariation(0);">1</button>
+                            <button class="btn btn-lg btn-default" onclick="PP2_FRONT.scriptPool.setVariation(2);">2</button>
+                        </div>
+                    </div>
+                    <div class="abs t0" style="left: 240px;right: 240px;bottom: 30px;border-bottom: solid 1px #9E9FA0;"></div>
+                    <div class="abs t0 b0 r0" style="width: 240px;">
+                        <div style="height: 30px;"><lang key="auto_fill"></lang></div>
+                        <div id="arranger-auto-fill-container" class="multi" style="height: 60px;">
+                            <button class="btn btn-lg btn-primary" onclick="PP2_FRONT.scriptPool.setAutoFill(false);"><lang key="off"></lang></button>
+                            <button class="btn btn-lg btn-default" onclick="PP2_FRONT.scriptPool.setAutoFill(true);"><lang key="on"></lang></button>
+                        </div>
+                    </div>
+                </div>
+                <div class="abs" style="right: 40px;bottom:50px;left:40px;height: 90px;">
+                    <div class="abs l0 b0" style="width: 240px;height: 60px;">
+                        <button id="arranger-intro-btn" class="abs btn btn-lg btn-default" style="left: 0;width: 100px;" onclick="PP2_ARRANGER.goToIntro();"><lang key="intro"></lang></button>
+                        <button id="arranger-ending-btn" class="abs btn btn-lg btn-default" style="right: 0;width: 120px;" onclick="PP2_ARRANGER.goToEnding();"><lang key="ending"></lang></button>
+                    </div>
+                    <div class="abs t0 b0 r0" style="width: 240px;">
+                        <div style="height: 30px;"><lang key="sync_start"></lang></div>
+                        <div id="arranger-sync-start-container" class="multi" style="height: 60px;">
+                            <button class="btn btn-lg btn-primary" onclick="PP2_FRONT.scriptPool.setSyncStart(false);"><lang key="off"></lang></button>
+                            <button class="btn btn-lg btn-default" onclick="PP2_FRONT.scriptPool.setSyncStart(true);"><lang key="start_camelcase"></lang></button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</script>

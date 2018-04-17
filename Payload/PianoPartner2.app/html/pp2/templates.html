@@ -1,0 +1,60 @@
+<script type="text/template" id="main-template">
+    <div class="header"></div>
+    <div class="content container-fluid text-center animsition"></div>
+    <div class="footer">
+        <div class="float-left">
+            <div id="ble-connect-message-container" style="margin-top: 10px;">
+                <img id="ble-connect-icon" src="./images/icon_connected.png" style="opacity: 0;margin-top: -8px;margin-left: -15px;margin-right: 5px;" />
+                <span id="ble-connect-message" style="opacity: 0;"></span>
+            </div>
+            <button class="icbtn icbtn-home footer-btn-top" style="display: none;" onclick="PP2_FRONT.goTo(PP2_CORE.applicationModes.Top);"></button>
+        </div>
+        <div class="footer-btn-container">
+            <button class="icbtn icbtn-songs footer-btn-songs" style="display: none;" onclick="PP2_FRONT.goTo(PP2_CORE.applicationModes.Songs);"></button>
+            <button class="icbtn icbtn-digiscore footer-btn-digiscorelite" style="display: none;" onclick="PP2_FRONT.goTo(PP2_CORE.applicationModes.DigiScoreLite);"></button>
+            <button class="icbtn icbtn-rhythm footer-btn-rhythm" style="display: none;" onclick="PP2_FRONT.goTo(PP2_CORE.applicationModes.Rhythm);"></button>
+            <button class="icbtn icbtn-flashcard footer-btn-flashcard" style="display: none;" onclick="PP2_FRONT.goTo(PP2_CORE.applicationModes.FlashCard);"></button>
+            <button class="icbtn icbtn-recorder footer-btn-recorder" style="display: none;" onclick="PP2_FRONT.goTo(PP2_CORE.applicationModes.Recorder);"></button>
+            <button class="icbtn icbtn-diary footer-btn-diary" style="display: none;" onclick="PP2_FRONT.goTo(PP2_CORE.applicationModes.Diary);"></button>
+        </div>
+        <img class="footer-logo" src="./images/img_logo.png" />
+        <button id="footer-secret-button" style="background: none;border: none;position: absolute;width: 60px;height: 60px;right: 0;bottom: 0;"></button>
+    </div>
+</script>
+
+<script type="text/template" id="modal-template">
+    <div class="modal fade center-modal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header"><%= header %></div>
+                <div class="modal-body"><%= body %></div>
+                <div class="modal-footer"><%= footer %></div>
+            </div>
+        </div>
+    </div>
+</script>
+
+<script type="text/template" id="right-modal-template">
+    <div class="modal fade right-modal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header" data-dismiss="modal"><%= header %></div>
+                <div class="modal-body"><%= body %></div>
+                <div class="modal-footer"><%= footer %></div>
+            </div>
+        </div>
+    </div>
+</script>
+
+<script type="text/template" id="loading-overlay-template">
+    <div id="loading-overlay" style="display: none;position: absolute;top: 0;right: 0; bottom: 0;left: 0;z-index: 10000;background-color: rgba(0,0,0,0.7);color: white;font-size: 40px">
+        <div style="display: table;width: 100%;height: 100%;">
+            <div style="display: table-cell;text-align: center; vertical-align: middle;">
+                <div id="loading-message">LOADING</div>
+                <div class="progress" style="margin: 20px 25%;">
+                    <div class="progress-bar progress-bar-striped active" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" style="width:0%"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</script>

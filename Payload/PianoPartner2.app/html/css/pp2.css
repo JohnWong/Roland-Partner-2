@@ -1,0 +1,879 @@
+html, body {
+    width: 100%;
+    height: 100%;
+}
+
+body {
+    margin: 0;
+    background: url('../images/bg_content.png') 0 0 repeat;
+
+    /* iOS用 */
+    -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+
+    color: #5A5B5C;
+}
+
+div.header {
+    position: absolute;
+    background: url('../images/bg_header.png') 0 0 repeat-x;
+    top: 0;
+    right: 0;
+    left: 0;
+    height: 60px;
+    text-align: center;
+}
+
+div.footer {
+    position: absolute;
+    background: url('../images/bg_footer.png') 0 0 repeat-x;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    height: 60px;
+    text-align: center;
+    z-index: 10000;
+}
+
+div.header div.float-left, div.header div.float-right, div.footer div.float-left, div.footer div.float-right {
+    height: 100%;
+    margin: 0;
+}
+
+div.header div.float-left .icbtn, div.header div.float-right .icbtn, div.footer div.float-left .icbtn, div.footer div.float-right .icbtn {
+    width: 54px;
+    height: 55px;
+    margin: 0;
+    padding: 0;
+}
+div.header div.float-left, div.footer div.float-left {
+    padding-left: 20px;
+}
+div.header div.float-right, div.footer div.float-right {
+    padding-right: 20px;
+}
+div.header div.float-left button {
+    margin-left: 5px;
+}
+div.header div.float-right button {
+    margin-left: 5px;
+}
+
+div.content {
+    position: absolute;
+    top: 60px;
+    right: 0;
+    bottom: 60px;
+    left: 0;
+    overflow: hidden;
+}
+div.title {
+    font-size: 30px;
+    color: darkblue;
+}
+div.titlebar {
+    height: 40px;
+    background-color: #9D9EA0;
+    color: white;
+    line-height: 40px;
+    font-size: 18px;
+    font-weight: bold;
+}
+
+/* フッター要素 */
+#ble-connect-message {
+    font-size: 20px;
+    line-height: 40px;
+}
+img.footer-logo {
+    float: right;
+}
+div.footer-btn-container {
+    position: absolute;
+    top: 0;
+    right: 200px;
+    bottom: 0;
+    left: 200px;
+    padding: 0;
+}
+div.footer-btn-container button {
+    width: 60px;
+    height: 90%;
+    margin: 0;
+    padding: 0;
+}
+
+/* ダイアログ */
+.center-modal .modal-content {
+    border: none;
+    border-radius: 0;
+    box-shadow: 0 0px 9px rgba(0,0,0,.2);
+}
+.center-modal .modal-header {
+    padding: 0;
+    border: none;
+    height: 40px;
+    background-color: #9D9EA0;
+    color: white;
+    line-height: 40px;
+    font-size: 18px;
+    font-weight: bold;
+    text-align: center;
+}
+.center-modal .modal-body {
+    padding: 20px;
+    border: none;
+    position: relative;
+}
+.center-modal .modal-footer {
+    border: none;
+    padding: 0 20px 20px 20px;
+}
+.center-modal .modal-footer button {
+    width: 150px;
+}
+.center-modal .modal-footer button.positive {
+    border-color: #F37321;
+    color: #F37321;
+    font-weight: bold;
+}
+
+.right-modal.modal {
+    z-index: 10001;
+}
+.right-modal .modal-dialog {
+    margin: 0;
+    position: absolute;
+    top: 60px;
+    bottom: 60px;
+    right: 0px;
+}
+.right-modal .modal-content {
+    border: none;
+    border-radius: 0;
+    height: 100%;
+    box-shadow: 0 0px 9px rgba(0,0,0,.2);
+}
+.right-modal .modal-header {
+    padding: 0;
+    border: none;
+    height: 40px;
+    background-color: #9D9EA0;
+    color: white;
+    line-height: 40px;
+    font-size: 18px;
+    font-weight: bold;
+    text-align: center;
+}
+.right-modal .modal-body {
+    padding: 0;
+    border: none;
+    position: absolute;
+    top: 40px;
+    right: 0;
+    bottom: 0;
+    left: 0;
+}
+.right-modal .modal-footer {
+    border: none;
+}
+
+/* プログレスバー */
+.progress {
+    height: 30px;
+}
+.progress-bar {
+    float: left;
+    width: 0;
+    height: 100%;
+    font-size: 12px;
+    line-height: 20px;
+    color: #fff;
+    text-align: center;
+    background-color: #F37321;
+    -webkit-box-shadow: inset 0 -1px 0 rgba(0, 0, 0, .15);
+    box-shadow: inset 0 -1px 0 rgba(0, 0, 0, .15);
+    -webkit-transition: width .6s ease;
+    -o-transition: width .6s ease;
+    transition: width .6s ease;
+}
+
+/* TOPボタン */
+.topbtn-container div {
+    padding-bottom: 20px;
+}
+.topbtn-container div div {
+    display: inline-block;
+    width: 202px;
+    padding: 0;
+    font-size: 20px;
+    line-height: 50px;
+    margin: 0 10px 20px 0;
+    white-space: nowrap;
+}
+.topbtn {
+    width: 162px;
+    height: 162px;
+    border: none;
+    background: none;
+    padding: 0;
+}
+.topbtn img {
+    width: 100%;
+    height: 100%;
+}
+.topbtn[disabled] img {
+    opacity: 0.2;
+}
+
+/* アイコンボタン */
+#icbtn-preloader {
+    width: 0;
+    height: 0;
+    background-image: url("../images/icon_dummy_on.png");
+}
+.icbtn {
+    border: none;
+    width: 40px;
+    height: 40px;
+}
+.icbtn-sample {
+    background: url("../images/icon_dummy.png") center no-repeat;
+}
+.icbtn-sample:active, .icbtn-sample.on {
+    background: url("../images/icon_dummy_on.png") center no-repeat;
+}
+.icbtn-sample[disabled] {
+    background: url("../images/icon_dummy_disabled.png") center no-repeat;
+}
+.icbtn-cog {
+    background: url("../images/icon_cog.png") center no-repeat;
+}
+.icbtn-cog:active, .icbtn-cog.on {
+    background: url("../images/icon_cog_on.png") center no-repeat;
+}
+.icbtn-info {
+    background: url("../images/icon_info.png") center no-repeat;
+}
+.icbtn-info:active, .icbtn-info.on {
+    background: url("../images/icon_info_on.png") center no-repeat;
+}
+.icbtn-user {
+    background: url("../images/icon_user.png") center no-repeat;
+}
+.icbtn-user:active, .icbtn-user.on {
+    background: url("../images/icon_user_on.png") center no-repeat;
+}
+.icbtn-remotecontroller {
+    background: url("../images/icon_remotecontroller.png") center no-repeat;
+}
+.icbtn-remotecontroller:active, .icbtn-remotecontroller.on {
+    background: url("../images/icon_remotecontroller_on.png") center no-repeat;
+}
+.icbtn-home {
+    background: url("../images/icon_home.png") center no-repeat;
+}
+.icbtn-home:active, .icbtn-home.on {
+    background: url("../images/icon_home_on.png") center no-repeat;
+}
+.icbtn-songs {
+    background: url("../images/icon_songs.png") center no-repeat;
+}
+.icbtn-songs[disabled] {
+    opacity: 0.3;
+}
+.icbtn-songs:active:not([disabled]), .icbtn-songs.on {
+    background: url("../images/icon_songs_on.png") center no-repeat;
+    opacity: 1;
+}
+.icbtn-digiscore {
+    background: url("../images/icon_digiscore.png") center no-repeat;
+}
+.icbtn-digiscore[disabled] {
+    opacity: 0.3;
+}
+.icbtn-digiscore:active:not([disabled]), .icbtn-digiscore.on {
+    background: url("../images/icon_digiscore_on.png") center no-repeat;
+    opacity: 1;
+}
+.icbtn-rhythm {
+    background: url("../images/icon_rhythm.png") center no-repeat;
+}
+.icbtn-rhythm[disabled] {
+    opacity: 0.3;
+}
+.icbtn-rhythm:active:not([disabled]), .icbtn-rhythm.on {
+    background: url("../images/icon_rhythm_on.png") center no-repeat;
+    opacity: 1;
+}
+.icbtn-flashcard {
+    background: url("../images/icon_flashcard.png") center no-repeat;
+}
+.icbtn-flashcard:active, .icbtn-flashcard.on {
+    background: url("../images/icon_flashcard_on.png") center no-repeat;
+}
+.icbtn-diary {
+    background: url("../images/icon_diary.png") center no-repeat;
+}
+.icbtn-diary[disabled] {
+    opacity: 0.3;
+}
+.icbtn-diary:active:not([disabled]), .icbtn-diary.on {
+    background: url("../images/icon_diary_on.png") center no-repeat;
+    opacity: 1;
+}
+.icbtn-recorder {
+    background: url("../images/icon_recorder.png") center no-repeat;
+}
+.icbtn-recorder[disabled] {
+    opacity: 0.3;
+}
+.icbtn-recorder:active:not([disabled]), .icbtn-recorder.on {
+    background: url("../images/icon_recorder_on.png") center no-repeat;
+    opacity: 1;
+}
+.icbtn-metronome {
+    background: url("../images/icon_metronome.png") center no-repeat;
+}
+.icbtn-metronome:active, .icbtn-metronome.on {
+    background: url("../images/icon_metronome_on.png") center no-repeat;
+}
+.icbtn-metronome-transparent {
+    background: url("../images/icon_metronome_transparent.png") center no-repeat;
+}
+.icbtn-metronome-transparent:active, .icbtn-metronome-transparent.on {
+    background: url("../images/icon_metronome_transparent_on.png") center no-repeat;
+}
+.icbtn-accomp {
+    background: url("../images/icon_accomp.png") center no-repeat;
+}
+.icbtn-accomp:active, .icbtn-accomp.on {
+    background: url("../images/icon_accomp_on.png") center no-repeat;
+}
+.icbtn-accomp[disabled] {
+    opacity: 0.3;
+}
+.icbtn-lefthand {
+    background: url("../images/icon_lefthand.png") center no-repeat;
+}
+.icbtn-lefthand:active, .icbtn-lefthand.on {
+    background: url("../images/icon_lefthand_on.png") center no-repeat;
+}
+.icbtn-lefthand[disabled] {
+    opacity: 0.3;
+}
+.icbtn-righthand {
+    background: url("../images/icon_righthand.png") center no-repeat;
+}
+.icbtn-righthand:active, .icbtn-righthand.on {
+    background: url("../images/icon_righthand_on.png") center no-repeat;
+}
+.icbtn-righthand[disabled] {
+    opacity: 0.3;
+}
+.icbtn-playmode {
+    background: url("../images/icon_playmode.png") center no-repeat;
+}
+.icbtn-playmode.on-order {
+    background: url("../images/icon_playmode_on_order.png") center no-repeat;
+}
+.icbtn-playmode.on-random {
+    background: url("../images/icon_playmode_on_random.png") center no-repeat;
+}
+.icbtn-playmode.on-onesong {
+    background: url("../images/icon_playmode_on_one.png") center no-repeat;
+}
+.icbtn-keyboard {
+    background: url("../images/icon_keyboard.png") center no-repeat;
+}
+.icbtn-keyboard:active, .icbtn-keyboard.on {
+    background: url("../images/icon_keyboard_on.png") center no-repeat;
+}
+.icbtn-tone {
+    background: url("../images/icon_tone.png") center no-repeat;
+}
+.icbtn-tone:active, .icbtn-tone.on {
+    background: url("../images/icon_tone_on.png") center no-repeat;
+}
+.icbtn-minus {
+    background: url("../images/icon_minus.png") center no-repeat;
+}
+.icbtn-plus {
+    background: url("../images/icon_plus.png") center no-repeat;
+}
+.icbtn-reset {
+    background: url("../images/icon_reset.png") center no-repeat;
+}
+.icbtn-play {
+    background: url("../images/icon_play.png") center no-repeat;
+}
+.icbtn-pause {
+    background: url("../images/icon_pause.png") center no-repeat;
+}
+.icbtn-rew {
+    background: url("../images/icon_rew.png") center no-repeat;
+}
+.icbtn-ff {
+    background: url("../images/icon_ff.png") center no-repeat;
+}
+.icbtn-auto-page-turn {
+    background: url("../images/icon_auto_page_turn.png") center no-repeat;
+}
+.icbtn-auto-page-turn:active, .icbtn-auto-page-turn.on {
+    background: url("../images/icon_auto_page_turn_on.png") center no-repeat;
+}
+.icbtn-previous-song {
+    background: url("../images/icon_previous_song.png") center no-repeat;
+}
+.icbtn-next-song {
+    background: url("../images/icon_next_song.png") center no-repeat;
+}
+.icbtn-metronome-settings {
+    background: url("../images/icon_metronome_setting.png") center no-repeat;
+}
+.icbtn-metronome-settings:active, .icbtn-metronome-settings.on {
+    background: url("../images/icon_metronome_setting_on.png") center no-repeat;
+}
+
+/* 通常ボタン */
+button {
+    outline: 0!important;
+}
+button.btn, span.btn {
+    font-size: 16px;
+    padding-left: 10px;
+    padding-right: 10px;
+    box-shadow: none;
+    text-shadow: none;
+}
+button.btn-default, button.btn-default:hover, button.btn-default:active, button.btn-default:focus, span.btn-default, span.btn-default:hover, span.btn-default:active, span.btn-default:focus, div.btn-default, div.btn-default:hover, div.btn-default:active, div.btn-default:focus {
+    background: transparent;
+    color: #5A5B5C;
+    border: solid 1px #BFC0C1;
+}
+button.btn-primary, button.btn-primary:hover, button.btn-primary:active, button.btn-primary:focus, div.btn-primary, div.btn-primary:hover, div.btn-primary:active, div.btn-primary:focus {
+    background: #F37321;
+    color: white;
+    border: solid 1px #BFC0C1;
+}
+button.btn[disabled], button.btn[disabled]:hover, button.btn[disabled]:active, button.btn[disabled]:focus {
+    background: transparent;
+    color: #DBDCDD;
+    border: solid 1px #DBDCDD;
+}
+button.btn-slider-helper {
+    position: absolute;
+    width: 36px;
+    height: 36px;
+    font-size: 22px;
+    padding: 1px 0 3px 0;
+}
+
+/* マルチボタン */
+.multi {
+    display:table;
+}
+.multi button {
+    display:table-cell;
+}
+.multi button:first-child {
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+    border-right: none;
+}
+.multi button:not(:first-child):not(:last-child) {
+    border-radius: 0;
+    border-right: none;
+}
+.multi button:last-child {
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+}
+.multi.multi-upper button {
+    border-bottom: none;
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+}
+.multi.multi-bottom button {
+    border-top-left-radius: 0;
+    border-top-right-radius: 0;
+}
+
+/* スライダー */
+.slider-handle {
+    background: #F37321;
+    width: 30px;
+    height: 30px;
+    margin-left: -15px !important;
+    margin-top: -10px !important;
+}
+
+.h10per {
+    height: 10%;
+}
+.h15per {
+    height: 15%;
+}
+.h20per {
+    height: 20%;
+}
+.h30per {
+    height: 30%;
+}
+.h35per {
+    height: 35%;
+}
+.h40per {
+    height: 40%;
+}
+.h50per {
+    height: 50%;
+}
+.h60per {
+    height: 60%;
+}
+.h70per {
+    height: 70%;
+}
+.h80per {
+    height: 80%;
+}
+.h90per {
+    height: 90%;
+}
+.h100per {
+    height: 100%;
+}
+.vcenter {
+    display: flex;
+    align-items: center;
+}
+.float-left {
+    float: left;
+}
+.float-right {
+    float: right;
+}
+.padding10 {
+    padding: 10px;
+}
+.scrollable-x {
+    overflow-y: hidden;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+.scrollable {
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+}
+.marquee {
+    overflow: hidden;
+    position: relative;
+}
+.marquee span {
+    white-space: nowrap;
+    position: relative;
+    top: 0;
+    bottom: 0;
+    left: 0;
+}
+
+/* テーブル */
+.data-table {
+    margin: 0;
+    border-bottom: none;
+}
+.data-table thead tr th, .data-table tbody tr th, .data-table tbody tr td {
+    border: none;
+    border-bottom: solid 1px #E1E2E3;
+    text-align: left;
+    padding-left: 15px;
+    padding-right: 15px;
+    font-size: 16px;
+}
+.data-table thead tr th:not(:first-child), .data-table tbody tr td:not(:first-child) {
+    border-left: solid 1px #E1E2E3;
+}
+.data-table thead tr th {
+    padding-top: 20px;
+    padding-bottom: 5px;
+    font-size: 16px;
+    color: #F37321;
+}
+.data-table tbody tr th {
+    font-size: 16px;
+    color: #F37321;
+}
+.data-table tbody tr.info td {
+    background-color: #F37321;
+    color: white;
+}
+
+.options-table {
+    table-layout: fixed;
+}
+.options-table tbody tr th, .options-table tbody tr td {
+    height: 57px;
+    padding: 10px 15px;
+    vertical-align: middle;
+}
+.options-table tbody tr td:not(:first-child) {
+    border-left: none;
+    text-align: right;
+}
+.options-table tbody tr th {
+    overflow: visible;
+    white-space: nowrap;
+    width: 0;
+}
+.options-table tbody tr th.noborder {
+    border-bottom: none;
+    vertical-align: bottom;
+    padding-bottom: 0;
+    height: 32px;
+}
+.options-table .multi {
+    display: table-cell;
+}
+.options-table .multi button {
+    display: inline-block;
+}
+
+/* レイアウト */
+.abs {
+    position: absolute;
+}
+.rel {
+    position: relative;
+}
+.t0 {
+    top: 0;
+}
+.r0 {
+    right: 0;
+}
+.b0 {
+    bottom: 0;
+}
+.l0 {
+    left: 0;
+}
+.border-right {
+    border-right: solid 1px lightgray;
+}
+
+.settings .title {
+    color: #F37321;
+    font-size: 16px;
+    font-weight: bold;
+    padding: 10px 0 0 13px;
+    min-height: 40px;
+}
+.settings .title span {
+    color: #5A5B5C;
+    font-weight: normal;
+}
+.settings .box {
+    padding: 5px 13px 0px 13px;
+}
+.settings .multi {
+    padding: 13px;
+}
+.settings .title .multi, .settings .title .bootstrap-select {
+    color: #F37321;
+    font-size: 16px;
+    font-weight: bold;
+    float: right;
+    position: relative;
+    padding: 0 13px;
+}
+.settings .title .btn.right, .settings .title .icbtn.right {
+    float: right;
+    margin-right: 13px;
+}
+.settings .slider.slider-horizontal {
+    margin-bottom: 10px;
+}
+.settings .tempo-value {
+    display: inline-block;
+    width: 60%;
+    height: 30px;
+    text-align: center;
+}
+.settings .tempo-value img {
+    width: 9px;
+    height: 15px;
+}
+.settings .tempo-value span {
+    font-size: 26px;
+    vertical-align: middle;
+}
+
+.modal-header .btn-tab-container {
+    position: absolute;
+    top: -20px;
+    height: 60px;
+    left: 0;
+    right: 0;
+}
+.modal-header .btn-tab {
+    margin: 0;
+    padding: 0;
+    border: none;
+    background: none;
+    height: 100%;
+}
+.modal-header .btn-tab lang {
+    display: inline-block;
+    margin: 24px 1px 0 1px;
+    padding: 0 20px;
+    height: 36px;
+    line-height: 36px;
+    background-color: #5A5B5C;
+    border-top-left-radius: 5px;
+    border-top-right-radius: 5px;
+    border: none;
+}
+.modal-header .btn-tab.current lang, .modal-header .btn-tab.current:hover lang, .modal-header .btn-tab.current:active lang, .modal-header .btn-tab.current:focus lang {
+    height: 37px;
+    background-color: #fff;
+    color: #F37321;
+}
+
+form.user .form-group {
+    padding: 10px;
+    margin: 0;
+    border-top: solid 1px #BFC0C1;
+    min-height: 56px;
+    position: relative;
+}
+form.user .form-group span.title {
+    font-size: 16px;
+    color: #5A5B5C;
+    vertical-align: middle;
+    line-height: 36px;
+}
+form.user .form-group div.right {
+    float: right;
+}
+form.user .form-control {
+    float: right;
+    width: 220px;
+}
+form.user .has-error .form-control {
+    border-color: #F37321;
+}
+form.user .has-error .help-block {
+    color: #F37321;
+    font-size: 12px;
+    font-weight: bold;
+    position: absolute;
+    top: 50%;
+    transform: translateY(16px);
+    -webkit-transform: translateY(16px);
+}
+form.user .help-block {
+    margin: 0;
+    padding: 0;
+}
+form.user .help-block ul {
+    margin: -8px 0 0 10px;
+}
+form.user .multi {
+    float: right;
+}
+
+.user-icon, .user-icon-small {
+    border: solid 1px #BFC0C1;
+    background: white url('../images/default_user.png') center center no-repeat;
+    background-size: 80%;
+}
+.user-icon {
+    width: 80px;
+    height: 80px;
+    border-radius: 40px;
+}
+.user-icon-small {
+    width: 40px;
+    height: 40px;
+    border-radius: 20px;
+}
+.glyphicon.glyphicon-trash:before {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translateX(-55%) translateY(-45%);
+    -webkit-transform: translateX(-55%) translateY(-45%);
+}
+.myglyphicon-reset:before {
+    content: " ";
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    width: 100%;
+    background: url('../images/icon_reset_big.png') center center no-repeat;
+    background-size: 100%;
+}
+.myglyphicon-play:before {
+    content: " ";
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    width: 100%;
+    background: url('../images/icon_play_big.png') center center no-repeat;
+    background-size: 100%;
+}
+.myglyphicon-pause:before {
+    content: " ";
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    width: 100%;
+    background: url('../images/icon_pause_big.png') center center no-repeat;
+    background-size: 100%;
+}
+.myglyphicon-rew:before {
+    content: " ";
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    width: 100%;
+    background: url('../images/icon_rew_big.png') center center no-repeat;
+    background-size: 100%;
+}
+.myglyphicon-ff:before {
+    content: " ";
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    width: 100%;
+    background: url('../images/icon_ff_big.png') center center no-repeat;
+    background-size: 100%;
+}
+.myglyphicon-black-large-circle:before {
+    content: " ";
+    position: absolute;
+    top: 11px;
+    left: 11px;
+    height:36px;
+    width:36px;
+    border-radius: 20px;
+    background-color: red;
+}
+.myglyphicon-stop:before {
+    content: " ";
+    position: absolute;
+    top: 15px;
+    left: 15px;
+    height: 28px;
+    width: 28px;
+    border-radius: 2px;
+    background-color: red;
+}

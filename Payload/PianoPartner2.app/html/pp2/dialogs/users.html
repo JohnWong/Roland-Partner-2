@@ -1,0 +1,216 @@
+<!-- エディタ参照のみの用途 -->
+<head>
+    <link rel="stylesheet" type="text/css" href="../../bootstrap-3.3.6-dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" type="text/css" href="../../bootstrap-3.3.6-dist/css/bootstrap-theme.min.css" />
+    <link rel="stylesheet" type="text/css" href="../../animsition/css/animsition.min.css" />
+    <link rel="stylesheet" type="text/css" href="../../css/pp2.css" />
+</head>
+<!-- / -->
+
+<script type="text/javascript">
+    $(function() {
+        var modal = $('.modal.users');
+        modal.find('.modal-body').css('max-height', (document.documentElement.clientHeight - 220) + 'px');
+        modal.find('.modal-dialog').css({width: '420px'});
+
+        var container = modal.find('.list-container');
+        var refreshList = function(items) {
+            _.forEach(items, function(item) {
+                var isCurrentUser = undefined !== PP2_DB.currentUser && item.objectId === PP2_DB.currentUser.objectId;
+                $('<div />').addClass('btn').addClass(isCurrentUser ? 'btn-primary' : 'btn-default')
+                    .append($('<img />').attr('src', item.icon).addClass('user-icon'))
+                    .append($('<span />').addClass('handle-name').text(item.handleName))
+                    .append($('<span />').addClass('last-lesson').text(_.sprintf('Last Lesson %s', undefined === item.lastLessonedAt ? '-' : fecha.format(new Date(item.lastLessonedAt), 'YYYY/MM/DD HH:mm:ss'))))
+                    .append(isCurrentUser && !item.isGuest ? $('<button />').addClass('btn btn-default glyphicon glyphicon-pencil').on('click', function () {
+                        PP2_FRONT.switchModal(modal, 'user_edit', 500);
+                    }) : '')
+                    .append(PP2_DEBUG.isDebugMode && isCurrentUser && !item.isGuest ? $('<button />').addClass('btn btn-default glyphicon glyphicon-trash').on('click', function () {
+                        PP2_FRONT.confirm('※ユーザ削除は検証用の機能です※\nユーザを削除しますか？', function () {
+                            new Promise(function (resolve, reject) {
+                                PP2_FRONT.showLoading(true);
+                                PP2_DB.currentUser.removed = true;
+                                PP2_DB.createOrUpdateUser(PP2_DB.currentUser, function (res) {
+                                    if (undefined !== res.error) {
+                                        reject(res.error);
+                                    } else {
+                                        resolve();
+                                    }
+                                });
+                            }).then(function () {
+                                return new Promise(function(resolve, reject){
+                                    PP2_DB_AWS_HANDLER.backupDataIfPossible(function () {
+                                        resolve();
+                                    });
+                                });
+                            }).then(function () {
+                                return new Promise(function (resolve, reject) {
+                                    PP2_AWS.deleteUser(function () {
+                                        resolve();
+                                    }, function (err) {
+                                        reject(err);
+                                    })
+                                });
+                            }).then(function () {
+                                return new Promise(function(resolve, reject){
+                                    PP2_DB.requestUsers(function (res) {
+                                        resolve(res.items);
+                                    });
+                                });
+                            }).then(function (users) {
+                                return new Promise(function (resolve, reject) {
+                                    PP2_DB_AWS_HANDLER.changeUserAndLogin(_.where(users, {isGuest: true})[0], function () {
+                                        resolve();
+                                    });
+                                });
+                            }).then(function () {
+                                PP2_FRONT.hideLoading();
+                                modal.modal('hide');
+                            }).catch(function (err) {
+                                PP2_DB.currentUser.removed = false;
+                                PP2_DB.createOrUpdateUser(PP2_DB.currentUser, function (res) {});
+                                PP2_FRONT.hideLoading();
+                                PP2_FRONT.alert(err);
+                            });
+                        });
+                    }) : '')
+                    .appendTo(container)
+                    .on('click', function() {
+                        if (isCurrentUser) {
+                            return;
+                        }
+                        var langValues = PP2_LANGUAGE.getValues();
+                        PP2_FRONT.confirm([langValues.confirm_change_user, langValues.confirm_ok_switch], function () {
+                            PP2_FRONT.showLoading(true);
+                            PP2_DB_AWS_HANDLER.changeUserAndLogin(item, function () {
+                                PP2_FRONT.hideLoading();
+                                modal.modal('hide');
+                            });
+                        });
+                    });
+            });
+        };
+        PP2_DB.requestUsers(function(res) {
+            if (res.items.length === 0) {
+                PP2_DB.createOrUpdateUser({
+                    email: '',
+                    password: '',
+                    handleName: 'Guest',
+                    saveDataToServer: true,
+                    calendarType: 0,
+                    developmentMode: 0,
+                    information: JSON.stringify({}),
+                    icon: PP2_FRONT.spacerSrc
+                }, function(res) {
+                    refreshList([res.item]);
+                });
+            } else {
+                refreshList(res.items);
+            }
+        });
+
+        modal.find('.migration-button').on('click', function() {
+            modal.modal('hide');
+            setTimeout(function() {
+                PP2_FRONT.showModal('user_data_migration', 500);
+            }, 400);
+        });
+        modal.find('.create-button').on('click', function() {
+            modal.modal('hide');
+            setTimeout(function() {
+                PP2_FRONT.showModal('user_create', 500);
+            }, 400);
+        });
+        modal.modal('backdrop');
+    });
+    //# sourceURL=dialogs/users.js
+</script>
+
+<style type="text/css">
+    .modal.users .modal-header {
+        padding: 10px;
+        height: 60px;
+    }
+    .modal.users .modal-body {
+        padding: 0;
+        border-bottom: solid 1px #BFC0C1;
+        overflow-y: auto;
+        overflow-x: hidden;
+        -webkit-overflow-scrolling: touch;
+    }
+    .modal.users .modal-footer {
+        padding: 10px;
+    }
+    .modal.users .modal-footer button:first-child {
+        float: left;
+    }
+    .modal.users .modal-footer button.btn-default {
+        color: #F37321;
+        border-color: #F37321;
+        min-width: 150px;
+        width: auto;
+    }
+    .modal.users .list-container div {
+        display: block;
+        position: relative;
+        height: 100px;
+        margin: 10px;
+        overflow: hidden;
+    }
+    .modal.users .list-container div img {
+        position: absolute;
+        top: 10px;
+        left: 15px;
+    }
+    .modal.users .list-container div span.handle-name {
+        position: absolute;
+        top: 30px;
+        left: 110px;
+        font-size: 20px;
+        font-weight: bold;
+        color: #F37321;
+    }
+    .modal.users .list-container div.btn-primary span.handle-name {
+        color: white;
+    }
+    .modal.users .list-container div span.last-lesson {
+        position: absolute;
+        top: 60px;
+        left: 123px;
+    }
+    .modal.users .list-container div button {
+        position: absolute;
+        top: 50%;
+        right: 10px;
+        transform: translateY(-50%);
+        -webkit-transform: translateY(-50%);
+    }
+    .modal.users .list-container div button, .modal.users .list-container div button:hover, .modal.users .list-container div button:focus {
+        position: absolute;
+        top: 50%;
+        right: 10px;
+        transform: translateY(-50%);
+        -webkit-transform: translateY(-50%);
+        background: #FFFFFF;
+        width: 36px;
+        height: 36px;
+        font-size: 20px;
+        padding: 0;
+     }
+    .modal.users .list-container div button.glyphicon-trash {
+        right: 56px;
+    }
+</style>
+
+<script type="text/html" id="header">
+    <lang key="users"></lang>
+    <button class="migration-button float-right icbtn icbtn-cog" data-dismiss="modal">&nbsp;</button>
+</script>
+
+<script type="text/html" id="body">
+    <div class="list-container"></div>
+</script>
+
+<script type="text/html" id="footer">
+    <button class="btn btn-default" data-dismiss="modal"><lang key="back"></lang></button>
+    <button class="create-button btn btn-default"><lang key="create_user"></lang></button>
+</script>

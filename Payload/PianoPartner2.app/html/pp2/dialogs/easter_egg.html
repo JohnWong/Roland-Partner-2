@@ -1,0 +1,158 @@
+<script type="text/javascript">
+    $(function() {
+        var field = $('#easter-egg-field');
+        var message = $('#easter-egg-message');
+        var futaba = $('#easter-egg-futaba');
+        var isPausing = false;
+        if (!PP2_FRONT.global.easterEggLevel) {
+            PP2_FRONT.global.easterEggLevel = 1;
+        }
+
+        var scale = $(window).height() >= 700 ? 1 : (($(window).height() - (700 - field.height())) / field.height());
+        field.css('transform', 'scale(' + scale + ', ' + scale + ')');
+        field.parent().css({height: (62 + field.height() * scale + 20) + 'px'});
+
+        var tap = function(x, y, ignoreAnimate) {
+            if (isPausing) {
+                return;
+            }
+            flip(getCell(x, y), ignoreAnimate);
+            flip(getCell(x - 1, y), ignoreAnimate);
+            flip(getCell(x + 1, y), ignoreAnimate);
+            flip(getCell(x, y - 1), ignoreAnimate);
+            flip(getCell(x, y + 1), ignoreAnimate);
+            if (field.find('.on').length == 0) {
+                isPausing = true;
+                setTimeout(function() {
+                    PP2_FLASHCARD.playSound(p2se.clap);
+                    futaba.animate({bottom: (parseInt(futaba.css('bottom'), 10) + 45) + 'px'}, 1000);
+                    if (PP2_FRONT.global.easterEggLevel >= 5) {
+                        message.html('I\'m Futaba. Meow!!');
+                        PP2_FRONT.global.easterEggLevel = 1;
+                    } else {
+                        message.html('Level.' + PP2_FRONT.global.easterEggLevel + ' Clear!!');
+                        PP2_FRONT.global.easterEggLevel++;
+                        setTimeout(initialize, 3000);
+                    }
+                }, 1000);
+            }
+        };
+        var getCell = function (x, y) {
+            return field.find('div[x=' + x + '][y=' + y + ']');
+        };
+        var flip = function(cell, ignoreAnimate) {
+            if (!cell.length) {
+                return;
+            }
+            if (cell.hasClass('on')) {
+                cell.removeClass('on');
+                if (ignoreAnimate) {
+                    cell.css({opacity: 0});
+                } else {
+                    cell.animate({opacity: 0}, 300, 'linear');
+                }
+            } else {
+                cell.addClass('on');
+                if (ignoreAnimate) {
+                    cell.css({opacity: 1});
+                } else {
+                    cell.animate({opacity: 1}, 300, 'linear');
+                }
+            }
+        };
+
+        var initialize = function() {
+            futaba.css({bottom: (-220 + (PP2_FRONT.global.easterEggLevel - 1) * 45) + 'px'});
+
+            field.find('div').remove();
+            var size = 3 + PP2_FRONT.global.easterEggLevel;
+
+            var px = 400 / size;
+            for (var y = 1; y <= size; y++) {
+                for (var x = 1; x <= size; x++) {
+                    $('<div />').attr({x: x, y: y}).on('click', (function(x, y) {
+                        return function() {
+                            tap(x, y);
+                            PP2_FLASHCARD.playTone(Math.floor(60 - (size * size / 2) + y * size + x).toString(16));
+                        };
+                    })(x, y)).css({width: px + 'px', height: px + 'px', top: (px * (y - 1)) + 'px', left: (px * (x - 1)) + 'px'}).appendTo(field);
+                }
+            }
+
+            switch (Math.floor(Math.random() * 4)) {
+                case 0:
+                    field.css('background-image', "url('./images/btn_songs.png')");
+                    break;
+                case 1:
+                    field.css('background-image', "url('./images/btn_digiscore.png')");
+                    break;
+                case 2:
+                    field.css('background-image', "url('./images/btn_rhythm.png')");
+                    break;
+                case 3:
+                    field.css('background-image', "url('./images/btn_flashcard.png')");
+                    break;
+            }
+            isPausing = false;
+            for (var i = 0; i < size * 3; i++) {
+                var x = 1 + Math.floor(Math.random() * size);
+                var y = 1 + Math.floor(Math.random() * size);
+                tap(x, y, true);
+            }
+            message.html('Level.' + PP2_FRONT.global.easterEggLevel + ' Start');
+        };
+
+        initialize();
+    });
+</script>
+
+<style type="text/css">
+    #easter-egg-field {
+        position: relative;
+        width: 400px;
+        height: 400px;
+        padding: 0;
+        background-size: cover;
+        overflow-y: hidden;
+        transform-origin: center top;
+        -webkit-transform-origin: center top;
+    }
+    #easter-egg-field div {
+        position: absolute;
+        margin: 0;
+        float: left;
+        opacity: 0;
+        background: #F37321;
+        z-index: 1;
+    }
+    #easter-egg-field img {
+        position: absolute;
+        width: 139px;
+        height: 250px;
+        bottom: -220px;
+        left: 20px;
+        z-index: 0;
+    }
+    #easter-egg-message {
+        margin: 0;
+        font-size: 30px;
+        color: #F37321;
+    }
+</style>
+
+<script type="text/html" id="header">
+    Secret Mode
+</script>
+
+<script type="text/html" id="body">
+    <div id="easter-egg-message"></div>
+    <div id="easter-egg-field">
+        <img id="easter-egg-futaba" src="./images/img_futaba.png" />
+    </div>
+</script>
+
+<script type="text/html" id="footer">
+    <div>
+        <button type="button" class="btn btn-default positive" data-dismiss="modal"><lang key="close"></lang></button>
+    </div>
+</script>

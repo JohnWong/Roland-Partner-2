@@ -1,0 +1,172 @@
+<!-- エディタ参照のみの用途 -->
+<head>
+    <link rel="stylesheet" type="text/css" href="../../bootstrap-3.3.6-dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" type="text/css" href="../../bootstrap-3.3.6-dist/css/bootstrap-theme.min.css" />
+    <link rel="stylesheet" type="text/css" href="../../animsition/css/animsition.min.css" />
+    <link rel="stylesheet" type="text/css" href="../../css/pp2.css" />
+</head>
+<!-- / -->
+
+<script type="text/javascript">
+    $(function() {
+        var callbackKeys = [];
+
+        PP2_FRONT.modalCloseCallback = function() {
+            PP2_MIDI.removeCallbacks(callbackKeys);
+        };
+
+        if (!PP2_CONTENTS.isRhythmStartByPedalAvailable()) {
+            $('#start-stop-btn-container').parent().hide();
+            $('#start-stop-btn-container').parent().prev().hide();
+        }
+
+        PP2_CORE.nativeCallbacks[PP2_CORE.nativeMethods.arranger.requestRhythmStartStopPedalMode] = function (mode) {
+            var buttons = $('#start-stop-btn-container').find('button');
+            buttons.removeClass('btn-primary').addClass('btn-default');
+            buttons.eq(mode).removeClass('btn-default').addClass('btn-primary');
+        };
+        PP2_CORE.nativeCallbacks[PP2_CORE.nativeMethods.arranger.requestBassInversion] = function(value) {
+            var buttons = $('#bass-inversion-btn-container').find('button');
+            buttons.removeClass('btn-primary').addClass('btn-default');
+            buttons.eq(value).removeClass('btn-default').addClass('btn-primary');
+        };
+
+        PP2_FRONT.scriptPool.setRhythmStartStopPedalMode = function (mode) {
+            PP2_ARRANGER.setRhythmStartStopPedalMode(mode);
+            PP2_ARRANGER.requestRhythmStartStopPedalMode();
+            PP2_MIDI.setArrangerPedalMode(mode);
+            PP2_SAVEDATA.data.rhythm.pedalMode = mode;
+        };
+        PP2_FRONT.scriptPool.setBassInversion = function (value) {
+            PP2_ARRANGER.setBassInversion(value);
+            PP2_ARRANGER.requestBassInversion();
+        };
+
+        PP2_FRONT.scriptPool.setChordRecognitionType = function(type) {
+            PP2_ARRANGER.setChordRecognitionType(type, PP2_ARRANGER.currentKeyboardMode);
+            PP2_FRONT.scriptPool.updateChordRecognitionTypeButton(type);
+        };
+
+        PP2_FRONT.scriptPool.updateChordRecognitionTypeButton = function(type) {
+            var buttons = $('#chord-recognition-type-btn-container').find('button');
+            buttons.removeClass('btn-primary').addClass('btn-default');
+            switch (type) {
+                case PP2_ARRANGER.chordRecongnitionType.standard:
+                    buttons.eq(0).removeClass('btn-default').addClass('btn-primary');
+                    break;
+                case PP2_ARRANGER.chordRecongnitionType.intelligent:
+                case PP2_ARRANGER.chordRecongnitionType.pianist:
+                    buttons.eq(1).removeClass('btn-default').addClass('btn-primary');
+                    break;
+            }
+        };
+
+        callbackKeys.push(PP2_MIDI.addCallback(p2addr.keyBoardMode, function(params) {
+            PP2_ARRANGER.currentKeyboardMode = params.value;
+            var rightButton = $('#chord-recognition-type-btn-container').find('button').eq(1);
+            if (params.value == 1) {
+                setTimeout(function() {
+                    PP2_FRONT.scriptPool.updateChordRecognitionTypeButton(PP2_ARRANGER.currentChordRecongnitionTypes.split);
+                }, 100);
+                rightButton.html(PP2_LANGUAGE.getValues().intelligent);
+                rightButton.unbind('click').bind('click', function() {
+                    PP2_FRONT.scriptPool.setChordRecognitionType(PP2_ARRANGER.chordRecongnitionType.intelligent);
+                });
+            } else {
+                setTimeout(function() {
+                    PP2_FRONT.scriptPool.updateChordRecognitionTypeButton(PP2_ARRANGER.currentChordRecongnitionTypes.other);
+                }, 100);
+                rightButton.html(PP2_LANGUAGE.getValues().pianist);
+                rightButton.unbind('click').bind('click', function() {
+                    PP2_FRONT.scriptPool.setChordRecognitionType(PP2_ARRANGER.chordRecongnitionType.pianist);
+                });
+            }
+        }));
+
+        // ArrangerBalance
+        var arrangerBalanceSlider = PP2_FRONT.initSlider($("#arrnger-balance"), $('#arrnger-balance-value'), p2addr.arrangerBalance, {min: -8, max: 8}, function(v) {
+            var arrangerBalance = v + 64;
+            PP2_FRONT.global.arrangerBalance = arrangerBalance;
+            return arrangerBalance;
+        }, -64, function (v) {
+            return PP2_LANGUAGE.getValues().balance + ' <span>' + PP2_CORE.valueToBalance(v) + '</span>';
+        });
+        callbackKeys.push(arrangerBalanceSlider.callbackKey);
+        var arrangerBalance = PP2_FRONT.global.arrangerBalance - 64;
+        arrangerBalanceSlider.slider.setValue(arrangerBalance);
+
+        PP2_ARRANGER.requestRhythmStartStopPedalMode();
+        PP2_ARRANGER.requestBassInversion();
+
+        PP2_MIDI.request(p2addr.keyBoardMode);
+    });
+    //# sourceURL=dialogs/rhythm_settings.js
+</script>
+
+<style type="text/css">
+    #start-stop-btn-container button {
+        width: 123px;
+    }
+    #bass-inversion-btn-container button {
+        width: 80px;
+    }
+    #arrnger-balance-value span {
+        color: #5A5B5C;
+        font-weight: normal;
+    }
+    #chord-recognition-type-btn-container button {
+        width: 184.5px;
+    }
+    .slider.slider-horizontal {
+        width: 254px;
+        margin: 10px 73px 10px 73px;
+    }
+</style>
+
+<script type="text/html" id="header">
+    <lang key="rhythm_settings"></lang>
+</script>
+
+<script type="text/html" id="body">
+    <table class="table data-table options-table">
+        <tbody>
+        <tr>
+            <th colspan="2" class="noborder"><lang key="start_stop_by_pedal"></lang></th>
+        </tr>
+        <tr>
+            <td colspan="2" id="start-stop-btn-container" class="multi">
+                <button class="btn btn-default" onclick="PP2_FRONT.scriptPool.setRhythmStartStopPedalMode(0);"><lang key="off"></lang></button><!--
+                --><button class="btn btn-default" onclick="PP2_FRONT.scriptPool.setRhythmStartStopPedalMode(1);"><lang key="left_pedal"></lang></button><!--
+                --><button class="btn btn-default" onclick="PP2_FRONT.scriptPool.setRhythmStartStopPedalMode(2);"><lang key="center_pedal"></lang></button>
+            </td>
+        </tr>
+        <tr>
+            <th><lang key="bass_inversion"></lang></th>
+            <td id="bass-inversion-btn-container" class="multi">
+                <button class="btn btn-default" onclick="PP2_FRONT.scriptPool.setBassInversion(0);"><lang key="off"></lang></button><!--
+                --><button class="btn btn-default" onclick="PP2_FRONT.scriptPool.setBassInversion(1);"><lang key="on"></lang></button>
+            </td>
+        </tr>
+        <tr>
+            <th colspan="2" id="arrnger-balance-value" class="noborder"><lang key="balance"></lang></th>
+        </tr>
+        <tr>
+            <td colspan="2" style="padding: 0;">
+                <input id="arrnger-balance" />
+            </td>
+        </tr>
+        <tr>
+            <th colspan="2" class="noborder"><lang key="chord_recognition_type"></lang></th>
+        </tr>
+        <tr>
+            <td colspan="2" id="chord-recognition-type-btn-container" class="multi">
+                <button class="btn btn-default" onclick="PP2_FRONT.scriptPool.setChordRecognitionType(PP2_ARRANGER.chordRecongnitionType.standard);"><lang key="standard"></lang></button><!--
+                --><button class="btn btn-default"><lang key="intelligent"></lang></button>
+            </td>
+        </tr>
+        </tbody>
+    </table>
+</script>
+
+<script type="text/html" id="footer">
+</script>

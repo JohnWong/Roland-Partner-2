@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Quattro AU/VST plug-in Sample</title>
+	<link rel="stylesheet" type="text/css" href="default.css" />
+	<script src="js/native.js"></script>
+	<script src="js/jquery.js"></script>
+
+	<style type="text/css"><!--
+		.cls_atention { color:#f00; font-weight: bold; }
+	--></style>
+</head>
+<body>
+
+	<h1>Quattro AU/VST plug-in</h1>
+
+	<p class ="cls_atention">
+		When you're ready for javascript application,<br>
+		you need '$native.app.ready()' calling for synchronization of plug-in host.
+	</p>
+
+	<p>Save State:</p>
+		<textarea cols=60 rows=4 id="getstate"></textarea>
+	<p>Load State:</p>
+		<textarea cols=60 rows=4 id="setstate"></textarea>
+
+	<p>go to <a href="index.html">Quattro Samples</a></p>
+
+	<script type = "text/javascript">
+
+	window.$plugin = {
+		setstate : function() {},
+		getstate : function() { return ''; }
+	};
+
+	$(function() {
+
+		window.$plugin.getstate = function() {
+			console.log('getstate');
+			return $('#getstate').val();
+		}
+
+		window.$plugin.setstate = function(data) {
+			$('#setstate').val(data);
+		}
+
+		$native.app.ready();
+	});
+
+	</script>
+
+</body>
+</html>

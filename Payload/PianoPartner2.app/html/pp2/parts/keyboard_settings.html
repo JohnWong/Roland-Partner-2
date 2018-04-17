@@ -1,0 +1,214 @@
+<!-- エディタ参照のみの用途 -->
+<head>
+    <link rel="stylesheet" type="text/css" href="../../bootstrap-3.3.6-dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" type="text/css" href="../../bootstrap-3.3.6-dist/css/bootstrap-theme.min.css" />
+    <link rel="stylesheet" type="text/css" href="../../animsition/css/animsition.min.css" />
+    <link rel="stylesheet" type="text/css" href="../../css/pp2.css" />
+</head>
+<!-- / -->
+
+<script type="text/javascript">
+    $(function() {
+        var shiftValueLimit = PP2_CONTENTS.getPartShiftValue() === -1 ? 2 : PP2_CONTENTS.getPartShiftValue();
+        var callbackKeys = [];
+        PP2_FRONT.scriptPool.keyboardSettingsIF = {
+            callbackKeys: callbackKeys
+        };
+
+        // キーボードモード
+        callbackKeys.push(PP2_FRONT.initMultiButton($('#keyboard-mode-buttons-container'), p2addr.keyBoardMode, undefined, function(value, isClicked) {
+            var options = $('#keyboard-options-container').find('.keyboard-options');
+            _.forEach(options, function(v) {
+                $(v).css('display', 'none');
+            });
+            $(options[value]).css('display', 'table');
+            if (isClicked) {
+                PP2_MIDI.requestKeyboardMode();
+            }
+        }));
+
+        // スプリットポイント
+        callbackKeys.push(PP2_FRONT.initSlider($('#split-point'), $('#split-point-value'), p2addr.splitPoint, {
+                min: 35,
+                max: 95
+            },
+            0, 0, function (v) {
+                return PP2_LANGUAGE.getValues().split_point + ' <span>' + PP2_CORE.noteToCode(v) + '</span>';
+            }).callbackKey);
+
+        // スプリットバランス設定
+        if (PP2_CONTENTS.isPartBalanceAvailable()) {
+            callbackKeys.push(PP2_FRONT.initSlider($('#split-balance'), $('#split-balance-value'), p2addr.splitBalance, {
+                    min: -8,
+                    max: 8
+                },
+                64, -64, function (v) {
+                    return PP2_LANGUAGE.getValues().balance + ' <span>' + PP2_CORE.valueToBalance(v) + '</span>';
+                }).callbackKey);
+        } else {
+            $('#split-balance').hide();
+            $('#split-balance-value').hide();
+        }
+
+        // スプリットの右シフト設定
+        if (PP2_CONTENTS.isRightShiftSettingAvailable()) {
+            callbackKeys.push(PP2_FRONT.initSlider($('#split-right-octave-shift'), $('#split-right-octave-shift-value'), p2addr.splitRightOctaveShift, {
+                    min: -shiftValueLimit,
+                    max: shiftValueLimit
+                },
+                64, -64, function (v) {
+                    return PP2_LANGUAGE.getValues().right_shift + ' <span>' + (v > 0 ? '+' : '') + v + '</span>';
+                }).callbackKey);
+        } else {
+            $('#split-right-octave-shift').hide();
+            $('#split-right-octave-shift-value').hide();
+        }
+
+        // スプリットの左シフト設定
+        if (PP2_CONTENTS.isLeftShiftSettingAvailable()) {
+            callbackKeys.push(PP2_FRONT.initSlider($('#split-left-octave-shift'), $('#split-left-octave-shift-value'), p2addr.splitOctaveShift, {
+                    min: -shiftValueLimit,
+                    max: shiftValueLimit
+                },
+                64, -64, function (v) {
+                    return PP2_LANGUAGE.getValues().left_shift + ' <span>' + (v > 0 ? '+' : '') + v + '</span>';
+                }).callbackKey);
+        } else {
+            $('#split-left-octave-shift').hide();
+            $('#split-left-octave-shift-value').hide();
+        }
+
+        // デュアルバランス設定
+        if (PP2_CONTENTS.isPartBalanceAvailable()) {
+            callbackKeys.push(PP2_FRONT.initSlider($("#dual-balance"), $("#dual-balance-value"), p2addr.dualBalance, {
+                    min: -8,
+                    max: 8
+                },
+                64, -64, function (v) {
+                    return PP2_LANGUAGE.getValues().balance + ' <span>' + PP2_CORE.valueToBalance(v) + '</span>';
+                }).callbackKey);
+        } else {
+            $("#dual-balance").hide();
+            $("#dual-balance-value").hide();
+        }
+
+        // デュアルのトーン1シフト設定
+        if (PP2_CONTENTS.isTone1ShiftSettingAvailable()) {
+            callbackKeys.push(PP2_FRONT.initSlider($("#dual-octave-shift1"), $("#dual-octave-shift1-value"), p2addr.dualTone1OctaveShift, {
+                    min: -shiftValueLimit,
+                    max: shiftValueLimit
+                },
+                64, -64, function (v) {
+                    return PP2_LANGUAGE.getValues().tone1_shift + ' <span>' + (v > 0 ? '+' : '') + v + '</span>';
+                }).callbackKey);
+        } else {
+            $('#dual-octave-shift1').hide();
+            $('#dual-octave-shift1-value').hide();
+        }
+
+        // デュアルのトーン2シフト設定
+        if (PP2_CONTENTS.isTone2ShiftSettingAvailable()) {
+            callbackKeys.push(PP2_FRONT.initSlider($("#dual-octave-shift2"), $("#dual-octave-shift2-value"), p2addr.dualOctaveShift, {
+                    min: -shiftValueLimit,
+                    max: shiftValueLimit
+                },
+                64, -64, function (v) {
+                    return PP2_LANGUAGE.getValues().tone2_shift + ' <span>' + (v > 0 ? '+' : '') + v + '</span>';
+                }).callbackKey);
+        } else {
+            $('#dual-octave-shift2').hide();
+            $('#dual-octav2-shift2-value').hide();
+        }
+
+        // ツインピアノモード設定
+        callbackKeys.push(PP2_FRONT.initMultiButton($('#keyboard-twin-options'), p2addr.twinPianoMode, undefined, function(value, isClicked) {
+            if (isClicked) {
+                PP2_MIDI.requestKeyboardMode();
+            }
+        }));
+
+        PP2_MIDI.requestKeyboardMode();
+
+        if (!PP2_CONTENTS.isTwinPianoAvailable()) {
+            $('#keyboard-mode-twin-piano-btn').remove();
+        }
+    });
+    //# sourceURL=parts/keyboard_settings.js
+</script>
+
+<style type="text/css">
+    #keyboard-mode-buttons-container {
+        position: absolute;
+        top: 20px;
+        left: 13px;
+        width: 464px;
+        height: 36px;
+    }
+    #keyboard-mode-buttons-container button, #keyboard-twin-options button {
+        position: absolute;
+        top: 0;
+        width: 116px;
+        height: 36px;
+    }
+    #keyboard-options-container {
+        border-top: solid 1px #BFC0C1;
+    }
+    #keyboard-options-container .title {
+        color: #F37321;
+        font-size: 16px;
+        font-weight: bold;
+        padding: 20px 0 0 13px;
+    }
+    #keyboard-options-container span {
+        color: #5A5B5C;
+        font-weight: normal;
+    }
+    #keyboard-options-container .title {
+        color: #F37321;
+        font-size: 16px;
+    }
+    #keyboard-options-container input {
+        width: 80%;
+    }
+    .keyboard-options {
+        position: relative;
+    }
+    .slider.slider-horizontal {
+        width: 344px;
+        margin: 10px 73px 0px 73px;
+    }
+</style>
+
+<script type="text/html" id="body">
+    <div id="keyboard-mode-buttons-container" class="multi">
+        <button class="abs btn btn-default" style="left: 0;"><lang key="single"></lang></button>
+        <button class="abs btn btn-default" style="left: 116px;"><lang key="split"></lang></button>
+        <button class="abs btn btn-default" style="left: 232px;"><lang key="dual"></lang></button>
+        <button id="keyboard-mode-twin-piano-btn" class="abs btn btn-default" style="left: 348px;"><lang key="twin_piano"></lang></button>
+    </div>
+    <div id="keyboard-options-container" class="abs r0 b0 l0" style="top: 77px;bottom: 0;">
+        <div id="keyboard-whole-options" class="keyboard-options" style="display: none;height: 100%;"></div>
+        <div id="keyboard-split-options" class="keyboard-options" style="display: none;height: 100%;">
+            <div id="split-point-value" class="title"></div>
+            <input id="split-point" />
+            <div id="split-balance-value" class="title"></div>
+            <input id="split-balance" />
+            <div id="split-right-octave-shift-value" class="title"></div>
+            <input id="split-right-octave-shift" />
+            <div id="split-left-octave-shift-value" class="title"></div>
+            <input id="split-left-octave-shift" />
+        </div>
+        <div id="keyboard-dual-options" class="keyboard-options" style="display: none;height: 100%;">
+            <div id="dual-balance-value" class="title"></div>
+            <input id="dual-balance" />
+            <div id="dual-octave-shift1-value" class="title"></div>
+            <input id="dual-octave-shift1" />
+            <div id="dual-octave-shift2-value" class="title"></div>
+            <input id="dual-octave-shift2" />
+        </div>
+        <div id="keyboard-twin-options" class="keyboard-options multi" style="display: none;height: 100%;">
+            <button class="btn btn-default" style="top: 20px;left: 129px"><lang key="pair"></lang></button>
+            <button class="btn btn-default" style="top: 20px;left: 245px"><lang key="individual"></lang></button>
+        </div>
+    </div>
+</script>

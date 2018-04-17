@@ -1,0 +1,525 @@
+<!-- エディタ参照のみの用途 -->
+<head>
+    <link rel="stylesheet" type="text/css" href="../../bootstrap-3.3.6-dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" type="text/css" href="../../bootstrap-3.3.6-dist/css/bootstrap-theme.min.css" />
+    <link rel="stylesheet" type="text/css" href="../../animsition/css/animsition.min.css" />
+    <link rel="stylesheet" type="text/css" href="../../css/pp2.css" />
+</head>
+<!-- / -->
+
+<script type="text/javascript">
+    $(function() {
+        var modal = $('.modal.user_create');
+        var modalBody = modal.find('.modal-body');
+        modalBody.css('height', (document.documentElement.clientHeight - 220) + 'px');
+
+        var step = 1;
+        var backButton = modal.find('.back-button');
+        var nextButton = modal.find('.next-button');
+        var registratedEmail = undefined;
+        var currentLocalUser = undefined;
+        var ageSelect = modal.find('select[name=age]');
+        var pianoPerformanceSelect = modal.find('select[name=pianoperformance]');
+        var lengthOfExperienceSelect = modal.find('select[name=lengthofexperience]');
+
+        var defaultUserName = PP2_CORE.generateUUID();
+        nextButton.on('click', function() {
+            var form = modal.find('.wizard').eq(step - 1).find('form');
+            form.validator().on('submit', function (e) {
+                var email = modal.find('input[name=email]').val();
+                var password = modal.find('input[name=password]').val();
+                if (!e.isDefaultPrevented()) {
+                    switch (step) {
+                        case 2:
+                            if (registratedEmail !== email) {
+                                PP2_FRONT.showLoading(true);
+                                PP2_AWS.registration(defaultUserName, email, password, function () {
+                                    PP2_FRONT.hideLoading();
+                                    registratedEmail = email;
+                                    modal.find('.verification-code-message').html(_.sprintf(PP2_LANGUAGE.getValues().user_verification_code_message, registratedEmail));
+                                    step++;
+                                    refresh();
+                                }, function (err) {
+                                    if (err.name === 'UsernameExistsException') {
+                                        // 既に登録済みのユーザだった場合は認証コードの再送を試みる
+                                        PP2_AWS.resendCode(email, function () {
+                                            PP2_FRONT.hideLoading();
+                                            registratedEmail = email;
+                                            modal.find('.verification-code-message').html(_.sprintf(PP2_LANGUAGE.getValues().user_verification_code_message, registratedEmail));
+                                            step++;
+                                            refresh();
+                                        }, function (err) {
+                                            PP2_FRONT.hideLoading();
+                                            if (err.name === 'InvalidParameterException') {
+                                                PP2_FRONT.alert(PP2_LANGUAGE.getValues().cognito_error_already_exists);
+                                            } else {
+                                                PP2_FRONT.alert(PP2_LANGUAGE.getValues().cognito_error_others_when_registration + '<br />' + err);
+                                            }
+                                            step--;
+                                            refresh();
+                                        });
+                                    } else {
+                                        PP2_FRONT.hideLoading();
+                                        PP2_FRONT.alert(PP2_LANGUAGE.getValues().cognito_error_others_when_registration + '<br />' + err);
+                                        step--;
+                                        refresh();
+                                    }
+                                });
+                            } else {
+                                step++;
+                                refresh();
+                            }
+                            break;
+                        case 3:
+                            var verificationCode = modal.find('input[name=verification-code]').val();
+                            PP2_FRONT.showLoading(true);
+                            PP2_AWS.confirmRegistration(defaultUserName, verificationCode, function() {
+                                // ログイン試行
+                                var loginAfterRegistration = function() {
+                                    PP2_FRONT.showLoading(true);
+                                    PP2_AWS.login(defaultUserName, password, true, function (userId) {
+                                        PP2_AWS.updatePreferredUsername(email, function () {
+                                            PP2_DB.createOrUpdateUser({
+                                                objectId: userId,
+                                                email: email,
+                                                password: PP2_CRYPT.encrypt(password),
+                                                handleName: modal.find('input[name=handlename]').val(),
+                                                saveDataToServer: true,
+                                                calendarType: 0,
+                                                developmentMode: 0, // TODO 実装
+                                                information: '{}',
+                                                icon: PP2_FRONT.spacerSrc
+                                            }, function (res) {
+                                                if (undefined !== res.error) {
+                                                    PP2_FRONT.hideLoading();
+                                                    PP2_FRONT.alert(res.error);
+                                                } else {
+                                                    PP2_AWS.saveUsers([res.item], function() {}, function(err) {
+                                                        PP2_FRONT.alert(err);
+                                                    });
+                                                    currentLocalUser = res.item;
+                                                    PP2_FRONT.hideLoading();
+                                                    step++;
+                                                    refresh();
+                                                }
+                                            });
+                                        }, function (err) {
+                                            PP2_FRONT.hideLoading();
+                                            if (err.name === 'AliasExistsException') {
+                                                registratedEmail = undefined;
+                                                defaultUserName = PP2_CORE.generateUUID();
+                                                PP2_FRONT.alert(PP2_LANGUAGE.getValues().cognito_error_already_exists);
+                                                PP2_AWS.deleteUser(function() {}, function (err) {
+                                                    PP2_FRONT.alert(err);
+                                                });
+                                                step = 1;
+                                            } else {
+                                                PP2_FRONT.alert(err);
+                                            }
+                                            refresh();
+                                        });
+                                    }, function (err) {
+                                        PP2_FRONT.hideLoading();
+                                        if (err.name === 'NotAuthorizedException') {
+                                            // 仮登録の時と今回とでパスワードの値が異なっていた場合は、パスワード再設定を実行
+                                            var showVerificationCodePrompt = function (onSuccess) {
+                                                var langValues = PP2_LANGUAGE.getValues();
+                                                var promptAccessor = PP2_FRONT.prompt([_.sprintf(langValues.create_user_reset_password_message, email),
+                                                        langValues.user_verification_code,
+                                                        langValues.submit],
+                                                    function (verificationCode) {
+                                                        PP2_FRONT.showLoading(true);
+                                                        PP2_AWS.resetPassword(email, verificationCode, password, function () {
+                                                            onSuccess();
+                                                        }, function (err) {
+                                                            PP2_FRONT.hideLoading();
+                                                            PP2_FRONT.alert(err, function () {
+                                                                showVerificationCodePrompt(onSuccess);
+                                                            });
+                                                        })
+                                                    });
+                                                promptAccessor.onReady = function (modal) {
+                                                    modal.find('form').css('border-bottom', 'solid 1px #BFC0C1').after(
+                                                        $('<div />').css({
+                                                            'text-align': 'center',
+                                                            padding: '10px 0 20px 0'
+                                                        }).append(
+                                                            $('<button />')
+                                                                .addClass('btn btn-default')
+                                                                .text(langValues.user_resend_verification_code)
+                                                                .on('click', function () {
+                                                                    PP2_AWS.forgotPassword(email, function () {
+                                                                        PP2_FRONT.alert(langValues.user_resend_verification_code_finished);
+                                                                    }, function (err) {
+                                                                        PP2_FRONT.alert(err);
+                                                                    });
+                                                                })
+                                                        )
+                                                    );
+                                                };
+                                            };
+                                            PP2_AWS.forgotPassword(email, function () {
+                                                PP2_FRONT.hideLoading();
+                                                showVerificationCodePrompt(function () {
+                                                    loginAfterRegistration();
+                                                });
+                                            }, function (err) {
+                                                PP2_FRONT.hideLoading();
+                                                PP2_FRONT.alert(err);
+                                            });
+                                        } else {
+                                            PP2_FRONT.alert(PP2_LANGUAGE.getValues().cognito_error_others_when_registration + '\n' + err);
+                                        }
+                                    });
+                                };
+                                loginAfterRegistration();
+                            }, function(err) {
+                                PP2_FRONT.hideLoading();
+                                if (err.name === 'CodeMismatchException') {
+                                    PP2_FRONT.alert(PP2_LANGUAGE.getValues().cognito_error_code_mismatch);
+                                } else {
+                                    PP2_FRONT.alert(err);
+                                }
+                            });
+                            break;
+                        case 5:
+                            PP2_FRONT.showLoading(true);
+
+                            currentLocalUser['saveDataToServer'] = modal.find('input[name=savedatatoserver]').prop('checked');
+                            currentLocalUser['calendarType'] = parseInt(modal.find('input[name=calendartype]:checked').val(), 10);
+                            currentLocalUser['information'] = JSON.stringify({
+                                age: ageSelect.prop('selectedIndex'),
+                                pianoPerformance: pianoPerformanceSelect.prop('selectedIndex'),
+                                lengthOfExperience: lengthOfExperienceSelect.prop('selectedIndex')
+                            });
+                            currentLocalUser['icon'] = modal.find('img[name=icon]').attr('src');
+                            PP2_DB.createOrUpdateUser(currentLocalUser, function(res) {
+                                if (undefined !== res.error) {
+                                    PP2_FRONT.hideLoading();
+                                    PP2_FRONT.alert(PP2_LANGUAGE.getValues().cognito_error_others_when_registration + '<br />' + res.error);
+                                } else {
+                                    PP2_DB.changeUser(res.item, function () {
+                                        PP2_FRONT.hideLoading();
+                                        modal.modal('hide');
+                                        PP2_AWS.saveUsers([res.item], function() {}, function(err) {
+                                            PP2_FRONT.alert(err);
+                                        });
+                                    });
+                                }
+                            });
+                            break;
+                        default:
+                            step++;
+                            refresh();
+                            break;
+                    }
+                }
+                e.preventDefault();
+            }).submit();
+        });
+        backButton.on('click', function() {
+            if (step <= 1) {
+                $('.modal').modal('hide');
+                setTimeout(function() {
+                    PP2_FRONT.showModal('users', 420);
+                }, 400);
+            } else {
+                step--;
+                refresh();
+            }
+        });
+        var refresh = function() {
+            modal.find('.wizard').hide().eq(step - 1).show();
+            switch (step) {
+                case 1:
+                    backButton.text(PP2_LANGUAGE.getValues().create_user_cancel);
+                    break;
+                case 5:
+                    nextButton.text(PP2_LANGUAGE.getValues().create_user_finish);
+                    break;
+                default:
+                    backButton.text(PP2_LANGUAGE.getValues().create_user_back);
+                    nextButton.text(PP2_LANGUAGE.getValues().create_user_next);
+                    break;
+            }
+            backButton.css('display', step === 4 ? 'none' : 'inline');
+        };
+
+        modal.find('img[name=icon]').attr('src', PP2_FRONT.spacerSrc);
+
+        modal.find('.icon-button').on('click', function () {
+            PP2_CORE.showImagePicker(function(res) {
+                var baseSrcData = res.src;
+                var img = new Image();
+                img.onload = function() {
+                    var canvas = document.createElement('canvas');
+                    canvas.width = 100;
+                    canvas.height = 100;
+                    var scale = img.width < img.height ? 100 / img.width : 100 / img.height;
+                    var imageWidth = img.width * scale;
+                    var imageHeight = img.height * scale;
+                    var ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, -(imageWidth - 100) / 2, -(imageHeight - 100) / 2, imageWidth, imageHeight);
+                    var type = baseSrcData.substring(5, baseSrcData.indexOf(";"));
+                    modal.find('img[name=icon]').attr('src', canvas.toDataURL(type));
+                };
+                img.src = res.src;
+            });
+        });
+
+        modal.find('.resend-verification-code-button').on('click', function() {
+            PP2_AWS.resendCode(defaultUserName, function () {
+                modal.find('.resend-verification-code-button').attr('disabled', true);
+                PP2_FRONT.alert(PP2_LANGUAGE.getValues().user_resend_verification_code_finished);
+                setTimeout(function() {
+                    modal.find('.resend-verification-code-button').removeAttr('disabled');
+                }, 5000);
+            }, function (err) {
+                PP2_FRONT.alert(PP2_LANGUAGE.getValues().cognito_error_others_when_registration + '<br />' + err);
+            });
+        });
+
+        PP2_FRONT.initMultiButtonWithoutMIDIConnection(modal.find('.wizard').eq(1).find('form').find('.multi'), [0, 1], function(v) {
+            var checkbox = modal.find('[name=acceptterm]');
+            if (v === 0) {
+                checkbox.removeProp('checked');
+            } else {
+                checkbox.prop('checked', true);
+            }
+        });
+
+        PP2_FRONT.initMultiButtonWithoutMIDIConnection(modal.find('.savedatatoserver-multi'), [0, 1], function(v) {
+            var checkbox = modal.find('[name=savedatatoserver]');
+            if (v === 0) {
+                checkbox.removeProp('checked');
+            } else {
+                checkbox.prop('checked', true);
+            }
+        });
+
+        PP2_FRONT.initMultiButtonWithoutMIDIConnection(modal.find('.calendartype-multi'), [0, 1], function(v) {
+            var radios = modal.find('[name=calendartype]');
+            if (v === 0) {
+                radios.first().prop('checked', true);
+            } else {
+                radios.last().prop('checked', true);
+            }
+        });
+
+        var langValues = PP2_LANGUAGE.getValues();
+        PP2_FRONT.initSelectWithoutMIDIConnection(ageSelect, [
+            langValues.enquete_blank,
+            langValues.enquete_age_1,
+            langValues.enquete_age_2,
+            langValues.enquete_age_3,
+            langValues.enquete_age_4,
+            langValues.enquete_age_5,
+            langValues.enquete_age_6,
+            langValues.enquete_age_7,
+            langValues.enquete_age_8,
+            langValues.enquete_age_9,
+            langValues.enquete_age_10]);
+        PP2_FRONT.initSelectWithoutMIDIConnection(pianoPerformanceSelect, [
+            langValues.enquete_blank,
+            langValues.enquete_piano_performance_1,
+            langValues.enquete_piano_performance_2,
+            langValues.enquete_piano_performance_3]);
+        PP2_FRONT.initSelectWithoutMIDIConnection(lengthOfExperienceSelect, [
+            langValues.enquete_blank,
+            langValues.enquete_length_of_experience_1,
+            langValues.enquete_length_of_experience_2,
+            langValues.enquete_length_of_experience_3,
+            langValues.enquete_length_of_experience_4,
+            langValues.enquete_length_of_experience_5]);
+
+        var termContainer = modal.find('.term-container').height(modalBody.height() - 60);
+        termContainer.find('pre').html(langValues.user_term);
+
+        refresh();
+    });
+    //# sourceURL=dialogs/user_create.js
+</script>
+
+<style type="text/css">
+    .modal.user_create .modal-body {
+        padding: 0;
+        border-bottom: solid 1px #BFC0C1;
+        overflow-y: auto;
+        overflow-x: hidden;
+        -webkit-overflow-scrolling: touch;
+    }
+    .modal.user_create .modal-footer {
+        padding: 10px;
+    }
+    .modal.user_create .modal-footer button:first-child {
+        float: left;
+    }
+    .modal.user_create .modal-footer button.btn-default {
+        color: #F37321;
+        border-color: #F37321;
+    }
+    .modal.user_create .term-container {
+        margin: 0;
+    }
+    .modal.user_create .term-container pre {
+        border-radius: 0;
+        margin: 0;
+        border: none;
+        white-space: pre-wrap;
+        font-family: CustomFont;
+        font-size: 16px;
+    }
+    .modal.user_create .term-container pre a {
+        color: red;
+        text-decoration: underline;
+    }
+    .modal.user_create pre.verification-code-message {
+        background: none;
+        border: none;
+        margin: 0;
+        padding: 10px;
+        white-space: pre-wrap;
+        font-family: CustomFont;
+        font-size: 16px;
+    }
+    .modal.user_create .enquete-title {
+        padding: 15px;
+        font-weight: bold;
+        color: #F37321;
+        font-size: 16px;
+        text-align: center;
+    }
+    .modal.user_create form.user {
+        border-bottom: solid 1px #BFC0C1;
+    }
+    form.user .btn-group.bootstrap-select {
+        float: right;
+    }
+    .resend-verification-code-button-container {
+        text-align: center;
+        padding: 30px;
+    }
+</style>
+
+<script type="text/html" id="header">
+    <lang key="create_user"></lang>
+</script>
+
+<script type="text/html" id="body">
+    <div class="wizard">
+        <form class="user" data-toggle="validator">
+            <div class="form-group">
+                <span class="title"><lang key="user_handle_name"></lang></span>
+                <input class="form-control" name="handlename" type="text" required data-required-error="Required." />
+                <div class="help-block with-errors"></div>
+            </div>
+            <div class="form-group">
+                <span class="title"><lang key="user_email"></lang></span>
+                <input class="form-control" name="email" type="email" required data-error="Invalid email." data-required-error="Required." />
+                <div class="help-block with-errors"></div>
+            </div>
+            <div class="form-group">
+                <span class="title"><lang key="user_email_confirm"></lang></span>
+                <input class="form-control" name="email-confirm" type="email" data-match="[name=email]" required data-required-error="Required." data-match-error="Not match." />
+                <div class="help-block with-errors"></div>
+            </div>
+            <div class="form-group">
+                <span class="title"><lang key="user_password"></lang></span>
+                <input class="form-control" name="password" type="password" required data-minlength="8" data-required-error="Required." data-error="Minimum of 8 characters." />
+                <div class="help-block with-errors"></div>
+            </div>
+            <div class="form-group">
+                <span class="title"><lang key="user_password_confirm"></lang></span>
+                <input class="form-control" name="password-confirm" type="password" data-match="[name=password]" required data-required-error="Required." data-match-error="Not match." />
+                <div class="help-block with-errors"></div>
+            </div>
+        </form>
+    </div>
+
+    <div class="wizard">
+        <div class="term-container scrollable"><pre></pre></div>
+        <form class="user" data-toggle="validator">
+            <div class="form-group">
+                <span class="title"><lang key="user_agree_terms"></lang></span>
+                <div class="multi">
+                    <button type="button" class="btn btn-primary"><lang key="no"></lang></button>
+                    <button type="button" class="btn btn-default"><lang key="yes"></lang></button>
+                </div>
+                <input name="acceptterm" style="display: none;" type="checkbox" required data-required-error="Required." />
+                <div class="help-block with-errors"></div>
+            </div>
+        </form>
+    </div>
+
+    <div class="wizard">
+        <pre class="verification-code-message"></pre>
+        <form class="user" data-toggle="validator">
+            <div class="form-group">
+                <span class="title"><lang key="user_verification_code"></lang></span>
+                <input class="form-control" name="verification-code" type="text" required data-required-error="Required." />
+                <div class="help-block with-errors"></div>
+            </div>
+        </form>
+        <div class="resend-verification-code-button-container">
+            <button type="button" class="resend-verification-code-button btn btn-default"><lang key="user_resend_verification_code"></lang></button>
+        </div>
+    </div>
+
+    <div class="wizard">
+        <form class="user" data-toggle="validator">
+            <div class="form-group">
+                <span class="title"><lang key="user_save_data_to_server"></lang></span>
+                <input name="savedatatoserver" type="checkbox" checked style="display: none;" />
+                <div class="savedatatoserver-multi multi">
+                    <button type="button" class="btn btn-default"><lang key="no"></lang></button>
+                    <button type="button" class="btn btn-primary"><lang key="yes"></lang></button>
+                </div>
+                <div class="help-block with-errors"></div>
+            </div>
+            <div class="form-group">
+                <span class="title"><lang key="user_first_day_of_a_week"></lang></span>
+                <input name="calendartype" type="radio" value="0" checked style="display: none;" />
+                <input name="calendartype" type="radio" value="1" style="display: none;" />
+                <div class="calendartype-multi multi">
+                    <button type="button" class="btn btn-primary"><lang key="user_sunday"></lang></button>
+                    <button type="button" class="btn btn-default"><lang key="user_monday"></lang></button>
+                </div>
+                <div class="help-block with-errors"></div>
+            </div>
+            <div class="form-group" style="height: 100px;">
+                <span class="title" style="line-height: 80px;"><lang key="user_icon"></lang></span>
+                <div class="right">
+                    <span class="icon-button btn btn-default"><lang key="user_select_icon"></lang></span>
+                    <img name="icon" class="user-icon" />
+                    <div class="help-block with-errors"></div>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <div class="wizard">
+        <div class="enquete-title"><lang key="enquete"></lang></div>
+        <form class="user" data-toggle="validator">
+            <div class="form-group">
+                <span class="title"><lang key="enquete_age"></lang></span>
+                <select name="age" data-width="150"></select>
+                <div class="help-block with-errors"></div>
+            </div>
+            <div class="form-group">
+                <span class="title"><lang key="enquete_piano_performance"></lang></span>
+                <select name="pianoperformance" data-width="150"></select>
+                <div class="help-block with-errors"></div>
+            </div>
+            <div class="form-group">
+                <span class="title"><lang key="enquete_length_of_experience"></lang></span>
+                <select name="lengthofexperience" data-width="150"></select>
+                <div class="help-block with-errors"></div>
+            </div>
+        </form>
+    </div>
+</script>
+
+<script type="text/html" id="footer">
+    <button class="back-button btn btn-default"><lang key="create_user_back"></lang></button>
+    <button class="next-button btn btn-default"><lang key="create_user_next"></lang></button>
+</script>

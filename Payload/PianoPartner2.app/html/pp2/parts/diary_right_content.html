@@ -1,0 +1,289 @@
+<!-- エディタ参照のみの用途 -->
+<head>
+    <link rel="stylesheet" type="text/css" href="../../bootstrap-3.3.6-dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" type="text/css" href="../../bootstrap-3.3.6-dist/css/bootstrap-theme.min.css" />
+    <link rel="stylesheet" type="text/css" href="../../animsition/css/animsition.min.css" />
+    <link rel="stylesheet" type="text/css" href="../../css/pp2.css" />
+</head>
+<!-- / -->
+
+<script type="text/javascript">
+    $(function() {
+        var currentDate = undefined;
+        var currentActivity = undefined;
+        var header = $('.diary-right-content-header');
+        var diaryContainer = $('.diary-right-content-diary-container');
+        var tabButtons = $('.diary-right-content-tab-buttons');
+        var container = $('.diary-right-content-container');
+
+        PP2_FRONT.scriptPool.diaryRightContentIF = {
+            setActivity: function(date, activity) {
+                currentDate = date;
+                currentActivity = activity;
+                var isLessoned = currentActivity.totalLessonTime > 0;
+
+                header.find('span.title').text(fecha.format(currentDate, 'YYYY/MM/DD'));
+                var totalMinutes = undefined === activity.totalLessonTime ? 0 : Math.ceil(activity.totalLessonTime / 60);
+                var hours = Math.floor(totalMinutes / 60);
+                var minutes = totalMinutes % 60;
+                var message = isLessoned ?
+                    (hours > 0 ?
+                        _.sprintf(PP2_LANGUAGE.getValues().diary_played_piano, hours, minutes) :
+                        _.sprintf(PP2_LANGUAGE.getValues().diary_played_piano_without_hour, minutes)
+                    ) :
+                    PP2_LANGUAGE.getValues().diary_not_played_piano;
+                header.find('span.description').text(message);
+
+                $('#share-button').on('click', function() {
+                    var keyCount = 0;
+                    if (undefined !== activity.countsOfEachKeys) {
+                        _.forEach(JSON.parse(activity.countsOfEachKeys), function (values) {
+                            _.forEach(values, function (v) {
+                                keyCount += v;
+                            });
+                        });
+                    }
+                    var ymd = PP2_LANGUAGE.isJa() ? fecha.format(currentDate, 'YYYY/MM/DD') : fecha.format(currentDate, 'MMM/D/YYYY');
+
+                    var shareMessage = _.sprintf(PP2_LANGUAGE.getValues().share_message_not_played, ymd);
+                    if (activity.totalLessonTime > 0) {
+                        if (PP2_LANGUAGE.isJa()) {
+                            if (hours > 0) {
+                                shareMessage = _.sprintf(PP2_LANGUAGE.getValues().share_message, ymd, hours, minutes, keyCount);
+                            } else {
+                                shareMessage = _.sprintf(PP2_LANGUAGE.getValues().share_message_without_hour, ymd, minutes, keyCount);
+                            }
+                        } else {
+                            if (hours > 0) {
+                                shareMessage = _.sprintf(PP2_LANGUAGE.getValues().share_message, ymd, hours, minutes, keyCount);
+                            } else {
+                                shareMessage = _.sprintf(PP2_LANGUAGE.getValues().share_message_without_hour, ymd, minutes, keyCount);
+                            }
+                        }
+                    }
+                    var diaryMaxLength = 140 - (shareMessage.length - 2);
+
+                    PP2_CORE.share(shareMessage);
+                    PP2_CORE.countUpUseCount(PP2_CORE.countTargets.DiaryShareButton);
+                });
+
+                var currentDiary = '';
+                if (undefined !== currentActivity && undefined !== currentActivity.diary && null !== currentActivity.diary) {
+                    currentDiary = currentActivity.diary;
+                }
+                diaryContainer.find('pre').text(currentDiary);
+                // 日記の編集
+                var diaryEditButton = diaryContainer.find('button');
+                var dialyEditOverlay = $('#diary-right-content-edit-diary-overlay');
+                var diaryEditTextarea = dialyEditOverlay.find('textarea');
+                dialyEditOverlay.on('click', function() {
+                    dialyEditOverlay.hide();
+                    dialyEditOverlay.appendTo(header);
+                });
+                diaryEditTextarea.on('click', function(e) {
+                    e.stopPropagation();
+                });
+                dialyEditOverlay.find('button').on('click', function(e) {
+                    dialyEditOverlay.hide();
+                    dialyEditOverlay.appendTo(header);
+
+                    if (currentDiary === diaryEditTextarea.val()) {
+                        return;
+                    }
+
+                    var isNew = false;
+                    if ('{}' === JSON.stringify(currentActivity)) {
+                        isNew = true;
+                        currentActivity.userId = PP2_DB.currentUser.objectId;
+                        currentActivity.startAt = currentDate;
+                        currentActivity.totalLessonTime = 0;
+                    }
+                    currentActivity.diary = diaryEditTextarea.val();
+                    currentDiary = diaryEditTextarea.val();
+                    PP2_DB.createOrUpdateActivity(currentActivity, function(res) {
+                        _.forEach(res.item, function(v, k) {
+                            currentActivity[k] = v;
+                        });
+                        diaryContainer.find('pre').text(currentActivity.diary);
+                        if (isNew) {
+                            PP2_FRONT.scriptPool.diaryIF.refresh();
+                        }
+                    });
+                    e.stopPropagation();
+                });
+                diaryEditButton.on('click', function() {
+                    diaryEditTextarea.val(diaryContainer.find('pre').text());
+                    dialyEditOverlay.appendTo($(document.body));
+                    dialyEditOverlay.show();
+                    diaryEditTextarea.focus();
+                });
+                if (PP2_CORE.isAndroid()) {
+                    dialyEditOverlay.find('.overlay-content').css({
+                        top: '20px',
+                        transform: 'translateX(-50%) translateY(0)'
+                    });
+                }
+
+                if (isLessoned) {
+                    $('.diary-right-content-activity-log').show();
+                    tabButtons.find('button').eq(0).trigger('click');
+                } else {
+                    $('.diary-right-content-activity-log').hide();
+                    tabButtons.hide();
+                }
+
+                // 自動クリックを除外した正確なカウントをとるため、最後にカウンター処理を追加
+                tabButtons.find('button').eq(0).on('click', function () {
+                    PP2_CORE.countUpUseCount(PP2_CORE.countTargets.DiaryPhraseButton);
+                });
+                tabButtons.find('button').eq(1).on('click', function () {
+                    PP2_CORE.countUpUseCount(PP2_CORE.countTargets.DiaryHoursButton);
+                });
+                tabButtons.find('button').eq(2).on('click', function () {
+                    PP2_CORE.countUpUseCount(PP2_CORE.countTargets.DiaryKeysButton);
+                });
+            },
+            getActivity: function() {
+                return currentActivity;
+            }
+        };
+
+        tabButtons.find('button').eq(0).on('click', function() {
+            tabButtons.find('.btn-primary').removeClass('btn-primary').addClass('btn-default');
+            $(this).removeClass('btn-default').addClass('btn-primary');
+
+            PP2_FRONT.loadPartsToElement(container, 'diary_right_content_recorded_songs');
+        });
+        tabButtons.find('button').eq(1).on('click', function() {
+            tabButtons.find('.btn-primary').removeClass('btn-primary').addClass('btn-default');
+            $(this).removeClass('btn-default').addClass('btn-primary');
+
+            PP2_FRONT.loadPartsToElement(container, 'diary_right_content_per_time_period_graph');
+        });
+        tabButtons.find('button').eq(2).on('click', function() {
+            tabButtons.find('.btn-primary').removeClass('btn-primary').addClass('btn-default');
+            $(this).removeClass('btn-default').addClass('btn-primary');
+
+            PP2_FRONT.loadPartsToElement(container, 'diary_right_content_per_key_graph');
+        });
+    });
+</script>
+
+<style type="text/css">
+    .diary-right-content-header {
+        height: 62px;
+        position: relative;
+    }
+    .diary-right-content-header span.title {
+        position: absolute;
+        display: inline-block;
+        top: 18px;
+        left: 13px;
+        font-weight: bold;
+        color: #F37321;
+        font-size: 18px;
+    }
+    .diary-right-content-header span.description {
+        position: absolute;
+        display: inline-block;
+        top: 18px;
+        right: 140px;
+        font-size: 16px;
+    }
+    .diary-right-content-header #share-button {
+        position: absolute;
+        top: 13px;
+        right: 13px;
+        width: 100px;
+    }
+    .diary-right-content-diary-container {
+        height: 80px;
+        border-bottom: solid 1px #BFC0C1;
+        position: relative;
+    }
+    .diary-right-content-diary-container pre {
+        position: absolute;
+        top: 0;
+        left: 13px;
+        bottom: 13px;
+        right: 64px;
+        background: #F9F9F9;
+        padding: 5px;
+        margin: 0;
+        text-align: left;
+    }
+    .diary-right-content-diary-container button {
+        position: absolute;
+        height: 36px;
+        top: 15px;
+        right: 13px;
+    }
+    .diary-right-content-activity-log {
+        height: 40px;
+        text-align: left;
+        padding: 10px;
+    }
+    .diary-right-content-tab-buttons {
+        width: 100%;
+        height: 62px;
+        text-align: left;
+        padding: 0 20px;
+    }
+    .diary-right-content-tab-buttons button {
+        width: 150px;
+    }
+    .diary-right-content-container {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        height: calc(100% - 220px);
+    }
+
+    #diary-right-content-edit-diary-overlay {
+        background: rgba(0,0,0,0.5);
+        display: none;
+        z-index: 20000;
+    }
+    #diary-right-content-edit-diary-overlay .overlay-content {
+        border-radius: 12px;
+        background: transparent;
+        position: absolute;
+        display: inline-block;
+        margin: auto;
+        width: 840px;
+        height: 35%;
+        top: 50%;
+        left: 50%;
+        transform: translateX(-50%) translateY(-50%);
+        padding: 20px;
+    }
+</style>
+
+<script type="text/html" id="body">
+    <div class="diary-right-content-header">
+        <span class="title">0000/00/00</span>
+        <span class="description"></span>
+        <button id="share-button" class="btn btn-default"><lang key="share"></lang></button>
+    </div>
+    <div class="diary-right-content-diary-container">
+        <pre class="scrollable"></pre>
+        <button class="btn btn-default glyphicon glyphicon-pencil"></button>
+    </div>
+    <div class="diary-right-content-activity-log">
+        <lang key="diary_activity_log"></lang>
+    </div>
+    <div class="diary-right-content-tab-buttons multi">
+        <button class="btn btn-default"><lang key="diary_song_list"></lang></button>
+        <button class="btn btn-default"><lang key="diary_count_per_time"></lang></button>
+        <button class="btn btn-default"><lang key="diary_count_per_key"></lang></button>
+    </div>
+    <div class="diary-right-content-container scrollable"></div>
+
+    <div id="diary-right-content-edit-diary-overlay" class="abs t0 r0 b0 l0">
+        <div class="overlay-content">
+            <textarea class="form-control abs" style="top: 20px;left: 20px;bottom: 20px;width: 687px;" maxlength="1000"></textarea>
+            <button class="btn btn-default abs" style="top: 50%;transform: translateY(-50%);right: 20px;width: 100px;background: #FFFFFF;"><lang key="prompt_submit"></lang></button>
+        </div>
+    </div>
+</script>

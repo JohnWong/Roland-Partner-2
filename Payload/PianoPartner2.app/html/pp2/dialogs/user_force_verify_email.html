@@ -1,0 +1,118 @@
+<!-- エディタ参照のみの用途 -->
+<head>
+    <link rel="stylesheet" type="text/css" href="../../bootstrap-3.3.6-dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" type="text/css" href="../../bootstrap-3.3.6-dist/css/bootstrap-theme.min.css" />
+    <link rel="stylesheet" type="text/css" href="../../animsition/css/animsition.min.css" />
+    <link rel="stylesheet" type="text/css" href="../../css/pp2.css" />
+</head>
+<!-- / -->
+
+<script type="text/javascript">
+    $(function() {
+        var modal = $('.modal.user_force_verify_email');
+        modal.find('.modal-dialog').css({width: '500px'});
+        var modalBody = modal.find('.modal-body');
+        modalBody.css('height', (document.documentElement.clientHeight - 220) + 'px');
+
+        modal.find('pre').html(_.sprintf(PP2_LANGUAGE.getValues().email_verification_message, PP2_DB.currentUser.email));
+
+        modal.find('.resend-button').on('click', function () {
+            PP2_AWS.resendEmailVerificationCode(function () {
+                PP2_FRONT.alert(PP2_LANGUAGE.getValues().user_resend_verification_code_finished);
+            }, function (err) {
+                PP2_FRONT.alert(err);
+            });
+        });
+
+        modal.find('.change-email-button').on('click', function () {
+            PP2_FRONT.switchModal(modal, 'user_force_change_email');
+        });
+
+        modal.find('.submit-button').on('click', function() {
+            var form = modal.find('form');
+            form.validator().on('submit', function (e) {
+                if (!e.isDefaultPrevented()) {
+                    PP2_FRONT.showLoading(true);
+                    PP2_AWS.verifyEmail(modal.find('input[name=force-verification-code]').val(), function () {
+                        PP2_FRONT.hideLoading();
+                        PP2_AWS.saveUsers([PP2_DB.currentUser], function () {
+                            // バックアップ処理のため、待たない
+                        }, function (err) {
+                            PP2_FRONT.alert(err);
+                        });
+                        if ('function' === typeof(PP2_FRONT.global.onShowForceVerifyEmailDialogFinished)) {
+                            modal.on('hidden.bs.modal', PP2_FRONT.global.onShowForceVerifyEmailDialogFinished);
+                        }
+                        modal.modal('hide');
+                    }, function (err) {
+                        PP2_FRONT.hideLoading();
+                        if (err.name === 'CodeMismatchException') {
+                            PP2_FRONT.alert(PP2_LANGUAGE.getValues().cognito_error_code_mismatch);
+                        } else {
+                            PP2_FRONT.alert(err);
+                        }
+                    });
+                }
+                e.preventDefault();
+            }).submit();
+        });
+    });
+    //# sourceURL=dialogs/user_force_verify_email.js
+</script>
+
+<style type="text/css">
+    .modal.user_force_verify_email .modal-body {
+        padding: 0;
+        border-bottom: solid 1px #BFC0C1;
+    }
+    .modal.user_force_verify_email .modal-footer {
+        padding: 10px;
+    }
+    .modal.user_force_verify_email pre {
+        font-size: 16px;
+        background: none;
+        border: none;
+        padding: 10px;
+        margin: 0;
+        white-space: pre-line;
+        word-wrap: break-word;
+        color: #5A5B5C;
+    }
+    .modal.user_force_verify_email .resend-button-container {
+        text-align: center;
+        padding: 10px 0 20px 0;
+    }
+    .modal.user_force_verify_email .modal-footer button {
+        width: auto;
+    }
+    .modal.user_force_verify_email .modal-footer button:first-child {
+        float: left;
+    }
+    .modal.user_force_verify_email form.user {
+        border-bottom: solid 1px #BFC0C1;
+    }
+</style>
+
+<script type="text/html" id="header">
+</script>
+
+<script type="text/html" id="body">
+    <pre class="message"></pre>
+    <form class="user">
+        <div class="form-group">
+            <span class="title"><lang key="user_verification_code"></lang></span>
+            <input type="text" name="force-verification-code" class="form-control" required data-required-error="Required." />
+            <div class="help-block with-errors"></div>
+        </div>
+    </form>
+    <div class="resend-button-container">
+        <button class="btn btn-default resend-button"><lang key="user_resend_verification_code"></lang></button>
+    </div>
+</script>
+
+<script type="text/html" id="footer">
+    <div>
+        <button type="button" class="change-email-button btn btn-default positive"><lang key="user_force_change_email_button"></lang></button>
+        <button type="button" class="submit-button btn btn-default positive"><lang key="submit"></lang></button>
+    </div>
+</script>

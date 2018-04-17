@@ -1,0 +1,44 @@
+<!-- エディタ参照のみの用途 -->
+<head>
+    <link rel="stylesheet" type="text/css" href="../../bootstrap-3.3.6-dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" type="text/css" href="../../bootstrap-3.3.6-dist/css/bootstrap-theme.min.css" />
+    <link rel="stylesheet" type="text/css" href="../../animsition/css/animsition.min.css" />
+    <link rel="stylesheet" type="text/css" href="../../css/pp2.css" />
+</head>
+<!-- / -->
+
+<script type="text/javascript">
+    $(function() {
+        PP2_CORE.countUpUseCount(PP2_CORE.applicationModes.RemoteController);
+        PP2_DB.createActionLogIfNeeded('remotecontroller');
+
+        if (undefined === PP2_FRONT.global.settingsHandlerIF) {
+            PP2_FRONT.global.settingsHandlerIF = {
+                goTo: function(name) {
+                    PP2_FRONT.global.settingsHandlerIF.selected = name;
+                    PP2_FRONT.reloadModal(name, 1000);
+                },
+                selected: 'overall_settings'
+            };
+        }
+        if (PP2_CORE.getCurrentApplicationMode() === PP2_CORE.applicationModes.Rhythm && PP2_FRONT.global.settingsHandlerIF.selected === 'metronome_settings') {
+            PP2_FRONT.global.settingsHandlerIF.selected = 'overall_settings';
+        }
+        setTimeout(function() {
+            PP2_FRONT.global.settingsHandlerIF.goTo(PP2_FRONT.global.settingsHandlerIF.selected, 1000);
+        }, 100);
+    });
+    //# sourceURL=dialogs/settings_handler.js
+</script>
+
+<style type="text/css">
+</style>
+
+<script type="text/html" id="header">
+</script>
+
+<script type="text/html" id="body">
+</script>
+
+<script type="text/html" id="footer">
+</script>

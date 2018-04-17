@@ -1,0 +1,74 @@
+<!-- エディタ参照のみの用途 -->
+<head>
+    <link rel="stylesheet" type="text/css" href="../../bootstrap-3.3.6-dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" type="text/css" href="../../bootstrap-3.3.6-dist/css/bootstrap-theme.min.css" />
+    <link rel="stylesheet" type="text/css" href="../../animsition/css/animsition.min.css" />
+    <link rel="stylesheet" type="text/css" href="../../css/pp2.css" />
+</head>
+<!-- / -->
+
+<script type="text/javascript">
+    $(function() {
+        var overlay = $('#recorded-songs-name-edit-overlay');
+        var input = overlay.find('input[type=text]');
+        PP2_FRONT.scriptPool.recordedSongsNameEditOverlayIF = {
+            show: function(container, item, onCommittedCallback) {
+                input.on('click', function(e) {
+                    e.stopPropagation();
+                });
+                overlay.on('click', function() {
+                    overlay.hide().appendTo(container);
+                }).appendTo($(document.body)).show();
+                input.val(item.name).focus();
+                overlay.find('button').off('click').on('click', function(e) {
+                    var value = input.val();
+                    overlay.hide().appendTo(container);
+                    if (item.name === value) {
+                        return;
+                    }
+                    item.name = value;
+                    PP2_DB.createOrUpdateRecordedSong(item, function() {onCommittedCallback();});
+                    e.stopPropagation();
+                });
+                if (PP2_CORE.isAndroid()) {
+                    overlay.find('.overlay-content').css({
+                        top: '20px',
+                        transform: 'translateX(-50%) translateY(0)',
+                        '-webkit-transform': 'translateX(-50%) translateY(0)'
+                    });
+                }
+            }
+        };
+    });
+</script>
+
+<style type="text/css">
+    #recorded-songs-name-edit-overlay {
+        background: rgba(0,0,0,0.5);
+        display: none;
+        z-index: 20000;
+    }
+    #recorded-songs-name-edit-overlay .overlay-content {
+        border-radius: 12px;
+        background: transparent;
+        position: absolute;
+        display: inline-block;
+        margin: auto;
+        width: 840px;
+        height: 76px;
+        top: 50%;
+        left: 50%;
+        transform: translateX(-50%) translateY(-50%);
+        -webkit-transform: translateX(-50%) translateY(-50%);
+        padding: 20px;
+    }
+</style>
+
+<script type="text/html" id="body">
+    <div id="recorded-songs-name-edit-overlay" class="abs t0 r0 b0 l0">
+        <div class="overlay-content">
+            <input type="text" class="form-control abs t0 l0" style="top: 20px;left: 20px;width: 687px;height: 36px;" maxlength="100" />
+            <button class="btn btn-default abs t0 r0" style="top: 20px;right: 20px;width: 100px;background: #FFFFFF;"><lang key="prompt_submit"></lang></button>
+        </div>
+    </div>
+</script>

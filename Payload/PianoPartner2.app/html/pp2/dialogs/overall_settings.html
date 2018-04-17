@@ -1,0 +1,382 @@
+<!-- エディタ参照のみの用途 -->
+<head>
+    <link rel="stylesheet" type="text/css" href="../../bootstrap-3.3.6-dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" type="text/css" href="../../bootstrap-3.3.6-dist/css/bootstrap-theme.min.css" />
+    <link rel="stylesheet" type="text/css" href="../../animsition/css/animsition.min.css" />
+    <link rel="stylesheet" type="text/css" href="../../css/pp2.css" />
+</head>
+<!-- / -->
+
+<script type="text/javascript">
+    $(function() {
+        if (PP2_CONTENTS.isKeyboardSettingAvailable()) {
+            $('lang[key=tone_settings]').remove();
+        } else {
+            $('lang[key=keyboard_and_tones_settings]').remove();
+        }
+
+        var callbackKeys = [];
+        PP2_FRONT.modalCloseCallback = function() {
+            PP2_MIDI.removeCallbacks(callbackKeys);
+            if (null != PP2_FRONT.scriptPool.masterVolumeIF) {
+                PP2_FRONT.scriptPool.masterVolumeIF.removeCallbacks();
+            }
+            // 変更点を通知する
+            PP2_MIDI.request('01000100', 256);
+            PP2_MIDI.request('01000200', 256);
+        };
+
+        // タブボタン設定
+        var tabButtons = $('.btn-tab').not('.current');
+        if (PP2_CORE.getCurrentApplicationMode() !== PP2_CORE.applicationModes.Rhythm) {
+            tabButtons.eq(0).on('click', function (e) {PP2_FRONT.global.settingsHandlerIF.goTo('metronome_settings');e.stopPropagation();});
+        } else {
+            tabButtons.eq(0).remove();
+        }
+        tabButtons.eq(1).on('click', function(e) {PP2_FRONT.global.settingsHandlerIF.goTo('keyboard_and_tone_settings');e.stopPropagation();});
+        $('.btn-tab.current').on('click', function(e) {e.stopPropagation();});
+
+        // マスターチューニング
+        var masterTuningSlider = $('#master-tuning-slider');
+        if (PP2_CONTENTS.isMasterTuningAvailable()) {
+            callbackKeys.push(PP2_FRONT.initMultiButton($('#master-tuning-buttons'), p2addr.masterTuning, [256,276], function(v, isClicked) {
+                if (isClicked) {
+                    PP2_MIDI.forceReceiveMessageFromCache(p2addr.masterTuning);
+                }
+            }));
+            callbackKeys.push(PP2_FRONT.initSlider(masterTuningSlider, $('#master-tuning-value'), p2addr.masterTuning, {min: 9, max: 518, step: 1},
+                function(v) {
+                    setTimeout(function() {PP2_MIDI.forceReceiveMessageFromCache(p2addr.masterTuning);}, 10);
+                    return v;
+                }, 0, function (v) {
+                    return (4144 + v) / 10 + ' Hz';
+                }).callbackKey);
+        } else {
+            masterTuningSlider.parent().remove();
+        }
+
+        // キー・タッチ
+        var keyTouchButtons = $('#key-touch-buttons');
+        if (PP2_CONTENTS.isKeyTouchAvailable()) {
+            callbackKeys.push(PP2_FRONT.initButton($('#key-touch-fix'), p2addr.keyTouch, 0, function(isClicked) {
+                if (isClicked) {
+                    PP2_MIDI.forceReceiveMessageFromCache(p2addr.keyTouch);
+                }
+            }));
+            var max = 0;
+            switch (PP2_CONTENTS.getKeyTouchTypeValue()) {
+                case 0:
+                    max = 100;
+                    callbackKeys.push(PP2_FRONT.initMultiButton(keyTouchButtons, p2addr.keyTouch, [10,30,50,70,90], function(v, isClicked) {
+                        if (isClicked) {
+                            PP2_MIDI.forceReceiveMessageFromCache(p2addr.keyTouch);
+                        }
+                    }));
+                    callbackKeys.push(PP2_FRONT.initSlider($('#key-touch-slider'), $('#key-touch-value'), p2addr.keyTouch, {max: max}, function (v) {
+                        setTimeout(function() {PP2_MIDI.forceReceiveMessageFromCache(p2addr.keyTouch);}, 10);
+                        return v;
+                    }).callbackKey);
+                    break;
+                case 1:
+                    max = 5;
+                    callbackKeys.push(PP2_FRONT.initMultiButton(keyTouchButtons, p2addr.keyTouch, [1,2,3,4,5], function(v, isClicked) {
+                        if (isClicked) {
+                            PP2_MIDI.forceReceiveMessageFromCache(p2addr.keyTouch);
+                        }
+                    }));
+                    $('#key-touch-slider').remove();
+                    $('#key-touch-value').remove();
+                    break;
+                case 2:
+                    max = 3;
+                    keyTouchButtons.children().first().remove();
+                    keyTouchButtons.children().last().remove();
+                    callbackKeys.push(PP2_FRONT.initMultiButton(keyTouchButtons, p2addr.keyTouch, [1,2,3], function(v, isClicked) {
+                        if (isClicked) {
+                            PP2_MIDI.forceReceiveMessageFromCache(p2addr.keyTouch);
+                        }
+                    }));
+                    $('#key-touch-slider').remove();
+                    $('#key-touch-value').remove();
+                    break;
+            }
+        } else {
+            keyTouchButtons.parent().hide();
+        }
+
+        // ピアノ音量
+        var masterVolumeContainer = $('#master-volume-container');
+        if (PP2_MIDI.isConnected() && PP2_CONTENTS.isMasterVolumeAvailable()) {
+            // マスタボリュームロード
+            PP2_FRONT.loadPartsToElement(masterVolumeContainer, 'master_volume', function () {
+                PP2_FRONT.scriptPool.masterVolumeIF.setSliderWidth(350);
+                $('#master-volume-value').parent().addClass('title');
+            });
+        } else {
+            masterVolumeContainer.hide();
+        }
+
+        // 音の響き
+        var ambienceSlider = $('#ambience-slider');
+        if (PP2_CONTENTS.isAmbienceAvailable()) {
+            $(PP2_CONTENTS.getAmbienceNameValue() === 0 ? 'lang[key="reverb_level"]' : 'lang[key="ambience"]').remove();
+            callbackKeys.push(PP2_FRONT.initSlider(ambienceSlider, $('#ambience-value'), p2addr.ambience, {max: PP2_CONTENTS.getAmbienceMaxValue()}).callbackKey);
+            ambienceSlider.parent().find('.slider').css('width', 'calc(100% - 146px)');
+            if (!PP2_CONTENTS.isHeadphones3DAmbienceAvailable()) {
+                ambienceSlider.parent().css('width', '100%');
+            }
+        } else {
+            ambienceSlider.parent().remove();
+        }
+
+        // ヘッドホン3Dアンビエンス
+        if (PP2_CONTENTS.isHeadphones3DAmbienceAvailable()) {
+            callbackKeys.push(PP2_FRONT.initMultiButton($('#headphones-3d-ambience-onoff-buttons'), p2addr.headphones3DAmbience, [0,1]));
+            if (!PP2_CONTENTS.isAmbienceAvailable()) {
+                $('#headphones-3d-ambience-onoff-buttons').css('margin-top', '-25px').parent().css('width', '100%');
+                $('#ambience-settings-container').css('height', '50px');
+            }
+        } else {
+            $('#headphones-3d-ambience-onoff-buttons').parent().remove();
+        }
+
+        if (!PP2_CONTENTS.isAmbienceAvailable() && !PP2_CONTENTS.isHeadphones3DAmbienceAvailable()) {
+            $('#ambience-settings-container').remove();
+        }
+
+        // 音の明るさ
+        var brillianceSlider = $('#brilliance-slider');
+        if (PP2_CONTENTS.isBrillianceAvailable()) {
+            callbackKeys.push(PP2_FRONT.initSlider(brillianceSlider, $('#brilliance-value'), p2addr.brilliance, {min: -PP2_CONTENTS.getBrillianceValue(), max: PP2_CONTENTS.getBrillianceValue()}, 64, -64, function(v) {
+                return (v > 0 ? '+' : '') + v;
+            }).callbackKey);
+            PP2_FRONT.initSenderButton($('#brilliance-reset-button'), p2addr.brilliance, function() {
+                setTimeout(function() {
+                    PP2_MIDI.forceReceiveMessageFromCache(p2addr.brilliance);
+                }, 100);
+                return 64;
+            });
+            brillianceSlider.parent().find('.slider').css('width', 'calc(100% - 146px)');
+        } else {
+            brillianceSlider.parent().parent().remove();
+        }
+
+        // トランスポーズ設定
+        var keyboardTransposeSlider = $('#keyboard-transpose-slider');
+        var keyTransposeButtons = $('.key-transpose-buttons');
+        var songTransposeSlider = $('#song-transpose-slider');
+        var songTransposeButtons = $('.song-transpose-buttons');
+        var transposeModeButtons = $('#transpose-mode-buttons');
+        if (PP2_CONTENTS.isTransposeAvailable()) {
+            PP2_FRONT.initSenderButton($('#keyboard-transpose-reset-button'), p2addr.keyTransposeWO, 64);
+            PP2_FRONT.initSenderButton($('#song-transpose-reset-button'), p2addr.songTransposeWO, 64);
+            switch (PP2_CONTENTS.getTransposeTypeValue()) {
+                case 0:
+                    $('lang[key="transpose"]').remove();
+                    transposeModeButtons.remove();
+                    callbackKeys.push(PP2_FRONT.initSlider(keyboardTransposeSlider, $('#keyboard-transpose-value'), [p2addr.keyTransposeRO, p2addr.keyTransposeWO], {min: -6, max: 5}, 64, -64, function (v) {
+                        return (v > 0 ? '+' : '') + v;
+                    }).callbackKey);
+                    PP2_FRONT.initMultiButton(keyTransposeButtons, [p2addr.keyTransposeRO, p2addr.keyTransposeWO], [58,59,60,61,62,63,64,65,66,67,68,69]);
+                    callbackKeys.push(PP2_FRONT.initSlider(songTransposeSlider, $('#song-transpose-value'), [p2addr.songTransposeRO, p2addr.songTransposeWO], {min: -12, max: 12}, 64, -64, function (v) {
+                        return (v > 0 ? '+' : '') + v;
+                    }).callbackKey);
+                    keyboardTransposeSlider.parent().find('.slider').css('display', 'none');
+                    songTransposeSlider.parent().find('.slider').css('width', 'calc(100% - 146px)');
+                    songTransposeButtons.hide();
+                    break;
+                case 1:
+                    $('lang[key="song_transpose"]').remove();
+                    $('lang[key="keyboard_transpose"]').remove();
+                    callbackKeys.push(PP2_FRONT.initMultiButton(transposeModeButtons, p2addr.transposeMode, [0,1,2], function(v) {
+                        switch(v) {
+                            case 0:
+                            case 1:
+                                songTransposeSlider.parent().parent().hide();
+                                keyboardTransposeSlider.parent().parent().show();
+                                break;
+                            case 2:
+                                songTransposeSlider.parent().parent().show();
+                                keyboardTransposeSlider.parent().parent().hide();
+                                break;
+                        }
+                    }));
+                    PP2_FRONT.initMultiButton(songTransposeButtons, [p2addr.songTransposeRO, p2addr.songTransposeWO], [58,59,60,61,62,63,64,65,66,67,68,69]);
+                    callbackKeys.push(PP2_FRONT.initSlider(songTransposeSlider, $('#song-transpose-value'), [p2addr.songTransposeRO, p2addr.songTransposeWO], {min: -6, max: 5}, 64, -64, function (v) {
+                        return (v > 0 ? '+' : '') + v;
+                    }).callbackKey);
+                    PP2_FRONT.initMultiButton(keyTransposeButtons, [p2addr.keyTransposeRO, p2addr.keyTransposeWO], [58,59,60,61,62,63,64,65,66,67,68,69]);
+                    callbackKeys.push(PP2_FRONT.initSlider(keyboardTransposeSlider, $('#keyboard-transpose-value'), [p2addr.keyTransposeRO, p2addr.keyTransposeWO], {min: -6, max: 5}, 64, -64, function (v) {
+                        return (v > 0 ? '+' : '') + v;
+                    }).callbackKey);
+                    keyboardTransposeSlider.parent().find('.slider').css('display', 'none');
+                    songTransposeSlider.parent().find('.slider').css('display', 'none');
+                    break;
+                case 2:
+                    $('lang[key="transpose"]').remove();
+                    transposeModeButtons.remove();
+                    songTransposeSlider.parent().parent().remove();
+                    callbackKeys.push(PP2_FRONT.initSlider(keyboardTransposeSlider, $('#keyboard-transpose-value'), [p2addr.keyTransposeRO, p2addr.keyTransposeWO], {min: -6, max: 5}, 64, -64, function (v) {
+                        return (v > 0 ? '+' : '') + v;
+                    }).callbackKey);
+                    PP2_FRONT.initMultiButton(keyTransposeButtons, [p2addr.keyTransposeRO, p2addr.keyTransposeWO], [58,59,60,61,62,63,64,65,66,67,68,69]);
+                    keyboardTransposeSlider.parent().find('.slider').css('display', 'none');
+                    break;
+                case 3:
+                    $('lang[key="keyboard_transpose"]').remove();
+                    transposeModeButtons.remove();
+                    songTransposeSlider.parent().parent().remove();
+                    callbackKeys.push(PP2_FRONT.initSlider(keyboardTransposeSlider, $('#keyboard-transpose-value'), [p2addr.keyTransposeRO, p2addr.keyTransposeWO], {min: -5, max: 6}, 64, -64, function (v) {
+                        return (v > 0 ? '+' : '') + v;
+                    }).callbackKey);
+                    var buttonVal = -5;
+                    keyTransposeButtons.find('button').each(function() {
+                        $(this).text((buttonVal > 0 ? '+' : '') + buttonVal);
+                        buttonVal++;
+                    });
+                    PP2_FRONT.initMultiButton(keyTransposeButtons, [p2addr.keyTransposeRO, p2addr.keyTransposeWO], [59,60,61,62,63,64,65,66,67,68,69,70]);
+                    keyboardTransposeSlider.parent().find('.slider').css('display', 'none');
+                    break;
+            }
+        } else {
+            keyboardTransposeSlider.parent().parent().parent().remove();
+        }
+
+        // rq1
+        PP2_MIDI.request('01000100', 256);
+        PP2_MIDI.request('01000200', 256);
+    });
+    //# sourceURL=dialogs/overall_settings.js
+</script>
+
+<style type="text/css">
+    .slider.slider-horizontal {
+        width: 350px;
+        margin: 10px 73px 0px 73px;
+    }
+    .slider.slider-horizontal.slider-master-volume {
+        margin: 10px 73px 0px 73px !important;
+    }
+    #brilliance-reset-button, #keyboard-transpose-reset-button, #song-transpose-reset-button {
+        float: right;
+        margin-right: 14px;
+        margin-top: 2px;
+    }
+    .key-transpose-buttons, .song-transpose-buttons {
+        text-align: center;
+    }
+    .key-transpose-buttons button, .song-transpose-buttons button {
+        width: 24px;
+        padding-left: 0;
+        padding-right: 0;
+        margin: 2px 0.52px;
+    }
+</style>
+
+<script type="text/html" id="header">
+    <div class="btn-tab-container">
+        <button class="btn-tab"><lang key="metronome_settings"></lang></button>
+        <button class="btn-tab"><lang key="tone_settings"></lang><lang key="keyboard_and_tones_settings"></lang></button>
+        <button class="btn-tab current"><lang key="overall_settings"></lang></button>
+    </div>
+</script>
+
+<script type="text/html" id="body">
+    <div class="abs t0 b0 l0 settings scrollable" style="right: 500px;">
+        <div style="border-bottom: solid 1px #BFC0C1;">
+            <div class="title"><lang key="master_tuning"></lang>&nbsp;<span id="master-tuning-value"></span></div>
+            <input id="master-tuning-slider" />
+            <div id="master-tuning-buttons" class="multi">
+                <button class="btn btn-default">440.0Hz</button>
+                <button class="btn btn-default">442.0Hz</button>
+            </div>
+        </div>
+        <div>
+            <div class="title"><lang key="key_touch"></lang>&nbsp;<span id="key-touch-value"></span></div>
+            <div class="box">
+                <button id="key-touch-fix" class="btn btn-default"><lang key="key_touch_fix"></lang></button>
+            </div>
+            <div id="key-touch-buttons" class="multi">
+                <button class="btn btn-default"><lang key="key_touch_super_light"></lang></button>
+                <button class="btn btn-default"><lang key="key_touch_light"></lang></button>
+                <button class="btn btn-default"><lang key="key_touch_medium"></lang></button>
+                <button class="btn btn-default"><lang key="key_touch_heavy"></lang></button>
+                <button class="btn btn-default"><lang key="key_touch_super_heavy"></lang></button>
+            </div>
+            <input id="key-touch-slider" />
+        </div>
+    </div>
+    <div class="abs t0 r0 b0 settings scrollable" style="left: 500px; border-left: solid 1px #BFC0C1;">
+        <div id="master-volume-container" style="height: 80px;"></div>
+        <div id="ambience-settings-container" class="rel" style="height: 80px;">
+            <div class="abs t0 l0 b0" style="width: 50%;">
+                <div class="title"><lang key="ambience"></lang><lang key="reverb_level"></lang>&nbsp;<span id="ambience-value"></span></div>
+                <input id="ambience-slider" />
+            </div>
+            <div class="abs t0 r0 b0" style="width: 50%;">
+                <div class="title">
+                    <lang key="headphones_3d_ambience"></lang>
+                </div>
+                <div id="headphones-3d-ambience-onoff-buttons" class="multi" style="float: right;padding-top: 0;">
+                    <button class="btn btn-default"><lang key="off"></lang></button>
+                    <button class="btn btn-default"><lang key="on"></lang></button>
+                </div>
+            </div>
+        </div>
+        <div style="height: 80px;">
+            <div class="title"><lang key="brilliance"></lang>&nbsp;<span id="brilliance-value"></span></div>
+            <div class="abs" style="display: inline-block;width: calc(100% - 99px);"><input id="brilliance-slider" /></div>
+            <button id="brilliance-reset-button" class="btn btn-default"><lang key="reset"></lang></button>
+        </div>
+        <div>
+            <div style="height: 80px;">
+                <div class="title"><lang key="song_transpose"></lang><lang key="transpose"></lang>&nbsp;<span id="song-transpose-value"></span></div>
+                <div class="abs" style="display: inline-block;width: calc(100% - 99px);"><input id="song-transpose-slider" />
+                    <div class="song-transpose-buttons">
+                        <button class="btn btn-default">-6</button><!--
+                     --><button class="btn btn-default">-5</button><!--
+                     --><button class="btn btn-default">-4</button><!--
+                     --><button class="btn btn-default">-3</button><!--
+                     --><button class="btn btn-default">-2</button><!--
+                     --><button class="btn btn-default">-1</button><!--
+                     --><button class="btn btn-default">0</button><!--
+                     --><button class="btn btn-default">+1</button><!--
+                     --><button class="btn btn-default">+2</button><!--
+                     --><button class="btn btn-default">+3</button><!--
+                     --><button class="btn btn-default">+4</button><!--
+                     --><button class="btn btn-default">+5</button>
+                    </div>
+                </div>
+                <button id="song-transpose-reset-button" class="btn btn-default"><lang key="reset"></lang></button>
+            </div>
+            <div style="height: 80px;">
+                <div class="title"><lang key="keyboard_transpose"></lang><lang key="transpose"></lang>&nbsp;<span id="keyboard-transpose-value"></span></div>
+                <div class="abs" style="display: inline-block;width: calc(100% - 99px);"><input id="keyboard-transpose-slider" />
+                    <div class="key-transpose-buttons">
+                        <button class="btn btn-default">-6</button><!--
+                     --><button class="btn btn-default">-5</button><!--
+                     --><button class="btn btn-default">-4</button><!--
+                     --><button class="btn btn-default">-3</button><!--
+                     --><button class="btn btn-default">-2</button><!--
+                     --><button class="btn btn-default">-1</button><!--
+                     --><button class="btn btn-default">0</button><!--
+                     --><button class="btn btn-default">+1</button><!--
+                     --><button class="btn btn-default">+2</button><!--
+                     --><button class="btn btn-default">+3</button><!--
+                     --><button class="btn btn-default">+4</button><!--
+                     --><button class="btn btn-default">+5</button>
+                    </div>
+                </div>
+                <button id="keyboard-transpose-reset-button" class="btn btn-default"><lang key="reset"></lang></button>
+            </div>
+            <div id="transpose-mode-buttons" class="multi">
+                <button class="btn btn-default"><lang key="transpose_mode_keyboard_and_song"></lang></button>
+                <button class="btn btn-default"><lang key="transpose_mode_keyboard"></lang></button>
+                <button class="btn btn-default"><lang key="transpose_mode_song"></lang></button>
+            </div>
+        </div>
+    </div>
+</script>
+
+<script type="text/html" id="footer">
+</script>

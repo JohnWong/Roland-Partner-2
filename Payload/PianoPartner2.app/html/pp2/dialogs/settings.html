@@ -1,0 +1,116 @@
+<script type="text/javascript">
+    $(function() {
+        var reloadTerminalList = function() {
+            var list = $('#terminal-list');
+            list.empty();
+            PP2_MIDI.getEndpoints(false, function(endpoints) {
+                _.forEach(endpoints, function(endpoint) {
+                    $('<li role="presentation"><a role="menuitem" tabindex="-1" href="#">' + endpoint.MIDIDeviceNameKey + '</a></li>').bind('click', function(e) {
+                        $('#terminal-dropdown').html(endpoint.MIDIDeviceNameKey + ' <span class="caret"></span>');
+                        PP2_MIDI.connect(endpoint);
+                        e.preventDefault();
+                    }).appendTo(list);
+                });
+            });
+        };
+        var callbackKeys = [];
+        callbackKeys.push(PP2_MIDI.addCallback(p2addr.eventsMidiChanged, function() {
+            $('#terminal-dropdown').html(PP2_MIDI.getMIDIDeviceName() + '<span class="caret"></span>');
+            reloadTerminalList();
+        }));
+        callbackKeys.push(PP2_MIDI.addCallback(p2addr.eventsMidiStartConnect, function() {
+            $('.right-modal').modal('hide');
+        }));
+
+        PP2_FRONT.modalCloseCallback = function() {
+            PP2_MIDI.removeCallbacks(callbackKeys);
+            if (null != PP2_FRONT.scriptPool.masterVolumeIF) {
+                PP2_FRONT.scriptPool.masterVolumeIF.removeCallbacks();
+            }
+        };
+
+        reloadTerminalList();
+        $('#terminal-dropdown').html(PP2_MIDI.getMIDIDeviceName() + '<span class="caret"></span>');
+
+        $('#initializeBtn').on('click', function(){
+            PP2_FRONT.showModal('initialize_confirm', 350);
+        });
+
+        if (PP2_MIDI.isConnected() && PP2_CONTENTS.isMasterVolumeAvailable()) {
+            // マスタボリュームロード
+            PP2_FRONT.loadPartsToElement($('#master-volume-container'), 'master_volume', function () {
+                PP2_FRONT.scriptPool.masterVolumeIF.setSliderWidth(374);
+            });
+        } else {
+            $('#master-volume-container').parent().hide();
+        }
+    });
+</script>
+
+<style type="text/css">
+    #terminal-dropdown span {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        right: 15px;
+        margin: auto 0;
+    }
+    .dropdown ul {
+        left: auto;
+        right: 0;
+        width: 250px;
+        min-height: 37px;
+        padding: 0;
+    }
+    .dropdown li {
+        height: 37px;
+        text-align: center;
+    }
+    .dropdown li:not(:first-child) {
+        border-top: solid 1px #BFC0C1;
+    }
+    .dropdown li a {
+        padding: 0;
+        line-height: 37px;
+        font-size: 16px;
+    }
+    .dropdown li a:hover, .dropdown li a:active, .dropdown li a:focus {
+        background: #F37321;
+        color: white;
+    }
+</style>
+
+<script type="text/html" id="header">
+    <lang key="settings"></lang>
+</script>
+
+<script type="text/html" id="body">
+    <table class="table data-table options-table">
+        <tbody>
+        <tr>
+            <th id="master-volume-container"></th>
+            <td></td>
+        </tr>
+        <tr>
+            <th><lang key="bluetooth_midi_device"></lang></th>
+            <td><button class="btn btn-default" style="width: 250px;" onclick="$native.midi.panel();"><lang key="bluetooth_midi_device"></lang></button></td>
+        </tr>
+        <tr>
+            <th><lang key="connection"></lang></th>
+            <td>
+                <div class="dropdown">
+                    <button class="btn btn-default dropdown-toggle" style="width: 250px;height: 37px" type="button" id="terminal-dropdown" data-toggle="dropdown"></button>
+                    <ul id="terminal-list" class="dropdown-menu" role="menu" aria-labelledby="terminal-dropdown"></ul>
+                </div>
+            </td>
+        </tr>
+        <tr>
+            <th><lang key="initialize_app_settings"></lang></th>
+            <td><button id="initializeBtn" class="btn btn-default" style="width: 250px;" data-dismiss="modal"><lang key="initialize"></lang></button></td>
+        </tr>
+        </tbody>
+    </table>
+</script>
+
+<script type="text/html" id="footer">
+</script>

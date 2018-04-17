@@ -1,0 +1,31 @@
+<script type="text/javascript">
+    $(function() {
+        $('#startInitializeBtn').on('click', function(){
+            PP2_CORE.initializeData(function(params) {
+                console.debug(params);
+                if (params.complete) {
+                    PP2_SAVEDATA.reset();
+                    PP2_MIDI.disconnect();
+                    PP2_FRONT.showModal('initialize_correct', 350);
+                }else{
+                    PP2_FRONT.showModal('initialize_incorrect', 350);
+                }
+            });
+        });
+    });
+</script>
+
+<script type="text/html" id="header">
+    <lang key="initialize"></lang>
+</script>
+
+<script type="text/html" id="body">
+    <p><lang key="sure_you_want"></lang></p>
+</script>
+
+<script type="text/html" id="footer">
+  <div>
+      <button type="button" class="btn btn-default positive" data-dismiss="modal"><lang key="no"></lang></button>
+      <button type="button" id="startInitializeBtn" class="btn btn-default" data-dismiss="modal"><lang key="yes"></lang></button>
+  </div>
+</script>

@@ -1,0 +1,392 @@
+<!-- エディタ参照のみの用途 -->
+<head>
+    <link rel="stylesheet" type="text/css" href="../../bootstrap-3.3.6-dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" type="text/css" href="../../bootstrap-3.3.6-dist/css/bootstrap-theme.min.css" />
+    <link rel="stylesheet" type="text/css" href="../../animsition/css/animsition.min.css" />
+    <link rel="stylesheet" type="text/css" href="../../css/pp2.css" />
+</head>
+<!-- / -->
+
+<script type="text/javascript">
+    $(function() {
+        PP2_FRONT.scriptPool.userResetPasswordReturnDialogName = 'user_edit';
+
+        var modal = $('.modal.user_edit');
+        var modalBody = modal.find('.modal-body');
+        modalBody.css('height', (document.documentElement.clientHeight - 220) + 'px');
+
+        var step = 1;
+        var backButton = modal.find('.back-button');
+        var nextButton = modal.find('.next-button');
+        var forgotPasswordButton = modal.find('.forgot-password-button');
+
+        var handleNameInput = modal.find('input[name=handlename]');
+        var emailInput = modal.find('input[name=email]');
+        var emailConfirmInput = modal.find('input[name=email-confirm]');
+        var newPasswordInput = modal.find('input[name=new-password]');
+        var newPasswordConfirmInput = modal.find('input[name=new-password-confirm]');
+
+        var iconInput = modal.find('img[name=icon]');
+
+        var oldPasswordCheckValue = undefined;
+        nextButton.on('click', function() {
+            var form = modal.find('.wizard').eq(step - 1).find('form');
+
+            var email = modal.find('input[name=email]').val();
+            if (email.length > 0 && email !== PP2_DB.currentUser.email) {
+                emailInput.attr('required', true);
+                emailConfirmInput.attr('required', true);
+            } else {
+                emailInput.removeAttr('required');
+                emailConfirmInput.removeAttr('required');
+            }
+            var newPassword = newPasswordInput.val();
+            if (newPassword.length > 0) {
+                newPasswordInput.attr('required', true);
+                newPasswordConfirmInput.attr('required', true);
+            } else {
+                newPasswordInput.removeAttr('required');
+                newPasswordConfirmInput.removeAttr('required');
+            }
+
+            if (undefined === oldPasswordCheckValue) {
+                oldPasswordCheckValue = PP2_CRYPT.decrypt(PP2_DB.currentUser.password);
+            }
+            var oldPasswordCheck = modal.find('input[name=old-password-check]');
+            oldPasswordCheck.val(oldPasswordCheckValue);
+            form.validator().on('submit', function (e) {
+                oldPasswordCheck.val('');
+                if (!e.isDefaultPrevented()) {
+                    switch (step) {
+                        case 4:
+                            PP2_FRONT.confirm(PP2_LANGUAGE.getValues().user_edit_confirm, function () {
+                                PP2_FRONT.showLoading(true);
+                                var currentEmail = PP2_DB.currentUser.email;
+                                var failedAction = function (err) {
+                                    PP2_FRONT.hideLoading();
+                                    switch (err.name) {
+                                        case 'UserNotFoundException':
+                                        case 'NotAuthorizedException':
+                                            PP2_FRONT.alert(PP2_LANGUAGE.getValues().cognito_error_user_modified_by_other_device, function () {
+                                                PP2_AWS.logout();
+                                                PP2_DB.currentUser = undefined;
+                                                PP2_FRONT.goTo(PP2_CORE.applicationModes.Top);
+                                            });
+                                            break;
+                                        case 'AliasExistsException':
+                                            PP2_FRONT.alert(PP2_LANGUAGE.getValues().cognito_error_already_exists);
+                                            break;
+                                        default:
+                                            PP2_FRONT.alert(PP2_LANGUAGE.getValues().cognito_error_others_when_update + '\n' + err);
+                                            break;
+                                    }
+                                };
+                                PP2_AWS.login(currentEmail, oldPasswordCheckValue, true, function() {
+                                    PP2_DB_AWS_HANDLER.updateEmail(email, function (isEmailUpdated) {
+                                        PP2_DB_AWS_HANDLER.updatePassword(oldPasswordCheckValue, newPassword, function() {
+                                            var newHandleName = handleNameInput.val();
+                                            if (newHandleName.length > 0) {
+                                                PP2_DB.currentUser.handleName = newHandleName;
+                                            }
+                                            PP2_DB.currentUser.saveDataToServer = modal.find('input[name=savedatatoserver]').prop('checked');
+                                            PP2_DB.currentUser.calendarType = parseInt(modal.find('input[name=calendartype]:checked').val(), 10);
+                                            var newIcon = iconInput.attr('src');
+                                            if (newIcon.length > 0 && newIcon !== PP2_FRONT.spacerSrc) {
+                                                PP2_DB.currentUser.icon = newIcon;
+                                            }
+                                            PP2_DB.createOrUpdateUser(PP2_DB.currentUser, function(res) {
+                                                if (undefined !== res.error) {
+                                                    failedAction(res.error);
+                                                } else {
+                                                    PP2_AWS.saveUsers([res.item], function () {}, function (err) {
+                                                        PP2_FRONT.alert(err);
+                                                    });
+                                                    PP2_FRONT.hideLoading();
+                                                    if (isEmailUpdated) {
+                                                        PP2_FRONT.showForceVerifyEmailDialog(function () {
+                                                            PP2_FRONT.alert(PP2_LANGUAGE.getValues().user_edit_complete, function () {
+                                                                PP2_DB.notifyUserChanged();
+                                                                PP2_FRONT.switchModal(modal, 'users');
+                                                            });
+                                                        });
+                                                    } else {
+                                                        PP2_FRONT.alert(PP2_LANGUAGE.getValues().user_edit_complete, function () {
+                                                            PP2_DB.notifyUserChanged();
+                                                            PP2_FRONT.switchModal(modal, 'users');
+                                                        });
+                                                    }
+                                                }
+                                            });
+                                        }, failedAction);
+                                    }, failedAction);
+                                }, failedAction);
+                            });
+                            break;
+                        default:
+                            step++;
+                            refresh();
+                            break;
+                    }
+                }
+                e.preventDefault();
+            }).submit();
+        });
+        backButton.on('click', function() {
+            if (step <= 1) {
+                modal.modal('hide');
+                setTimeout(function() {
+                    PP2_FRONT.showModal('users', 420);
+                }, 400);
+            } else {
+                step--;
+                refresh();
+            }
+        });
+
+        forgotPasswordButton.on('click', function () {
+            PP2_FRONT.showLoading(true);
+            PP2_AWS.forgotPassword(PP2_DB.currentUser.email, function () {
+                PP2_FRONT.hideLoading();
+                modal.on('hidden.bs.modal', function () {
+                    PP2_FRONT.showModal('user_reset_password', 500, function() {
+                        PP2_FRONT.scriptPool.userResetPasswordIF.setEmail(PP2_DB.currentUser.email);
+                    });
+                }).modal('hide');
+            }, function (err) {
+                PP2_FRONT.hideLoading();
+                PP2_FRONT.alert(err);
+            })
+        });
+
+        var refresh = function() {
+            modal.find('.wizard').hide().eq(step - 1).show();
+            switch (step) {
+                case 1:
+                    backButton.text(PP2_LANGUAGE.getValues().edit_user_cancel);
+                    break;
+                case 4:
+                    nextButton.text(PP2_LANGUAGE.getValues().edit_user_finish);
+                    break;
+                default:
+                    backButton.text(PP2_LANGUAGE.getValues().edit_user_back);
+                    nextButton.text(PP2_LANGUAGE.getValues().edit_user_next);
+                    break;
+            }
+            forgotPasswordButton.css('display', step === 1 ? 'inline-block' : 'none');
+        };
+
+        modal.find('img[name=icon]').attr('src', PP2_FRONT.spacerSrc);
+
+        modal.find('.icon-button').on('click', function () {
+            PP2_CORE.showImagePicker(function(res) {
+                var baseSrcData = res.src;
+                var img = new Image();
+                img.onload = function() {
+                    var canvas = document.createElement('canvas');
+                    canvas.width = 100;
+                    canvas.height = 100;
+                    var scale = img.width < img.height ? 100 / img.width : 100 / img.height;
+                    var imageWidth = img.width * scale;
+                    var imageHeight = img.height * scale;
+                    var ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, -(imageWidth - 100) / 2, -(imageHeight - 100) / 2, imageWidth, imageHeight);
+                    var type = baseSrcData.substring(5, baseSrcData.indexOf(";"));
+                    modal.find('img[name=icon]').attr('src', canvas.toDataURL(type));
+                };
+                img.src = res.src;
+            });
+        });
+
+        PP2_FRONT.initMultiButtonWithoutMIDIConnection(modal.find('.wizard').eq(3).find('form').find('.multi'), [0, 1], function(v) {
+            var checkbox = modal.find('[name=acceptterm]');
+            if (v === 0) {
+                checkbox.removeProp('checked');
+            } else {
+                checkbox.prop('checked', true);
+            }
+        });
+
+        var saveDataToServerAccessor = PP2_FRONT.initMultiButtonWithoutMIDIConnection(modal.find('.savedatatoserver-multi'), [0, 1], function(v) {
+            var checkbox = modal.find('[name=savedatatoserver]');
+            if (v === 0) {
+                checkbox.removeProp('checked');
+            } else {
+                checkbox.prop('checked', true);
+            }
+        });
+
+        var calendarTypeAccessor = PP2_FRONT.initMultiButtonWithoutMIDIConnection(modal.find('.calendartype-multi'), [0, 1], function(v) {
+            var radios = modal.find('[name=calendartype]');
+            if (v === 0) {
+                radios.first().prop('checked', true);
+            } else {
+                radios.last().prop('checked', true);
+            }
+        });
+
+        var termContainer = modal.find('.term-container').height(modalBody.height() - 60);
+        termContainer.find('pre').html(PP2_LANGUAGE.getValues().user_term);
+
+        // 各項目のデフォルト値設定
+        handleNameInput.attr('placeholder', PP2_DB.currentUser.handleName);
+        emailInput.attr('placeholder', PP2_DB.currentUser.email);
+        emailConfirmInput.attr('placeholder', PP2_DB.currentUser.email);
+        newPasswordInput.attr('placeholder', new Array(9).join('●'));
+        newPasswordConfirmInput.attr('placeholder', new Array(9).join('●'));
+        iconInput.attr('src', PP2_DB.currentUser.icon);
+        saveDataToServerAccessor.setValue(PP2_DB.currentUser.saveDataToServer ? 1 : 0);
+        calendarTypeAccessor.setValue(PP2_DB.currentUser.calendarType);
+
+        refresh();
+
+        modal.modal('backdrop');
+    });
+    //# sourceURL=dialogs/user_edit.js
+</script>
+
+<style type="text/css">
+    .modal.user_edit .modal-body {
+        padding: 0;
+        border-bottom: solid 1px #BFC0C1;
+        overflow-y: auto;
+        overflow-x: hidden;
+        -webkit-overflow-scrolling: touch;
+    }
+    .modal.user_edit .modal-footer {
+        padding: 10px;
+    }
+    .modal.user_edit .modal-footer button {
+        width: auto;
+        min-width: 100px;
+    }
+    .modal.user_edit .modal-footer button:first-child {
+        float: left;
+    }
+    .modal.user_edit .modal-footer button.btn-default {
+        color: #F37321;
+        border-color: #F37321;
+    }
+    .modal.user_edit .term-container {
+        margin: 0;
+    }
+    .modal.user_edit .term-container pre {
+        border-radius: 0;
+        margin: 0;
+        border: none;
+        white-space: pre-wrap;
+        font-family: CustomFont;
+        font-size: 16px;
+    }
+    .modal.user_edit .term-container pre a {
+        color: red;
+        text-decoration: underline;
+    }
+    .modal.user_edit .form-title {
+        padding: 15px;
+        font-weight: bold;
+        color: #F37321;
+        font-size: 16px;
+        text-align: center;
+    }
+</style>
+
+<script type="text/html" id="header">
+    <lang key="edit_user"></lang>
+</script>
+
+<script type="text/html" id="body">
+    <div class="wizard">
+        <form class="user" data-toggle="validator">
+            <div class="form-group">
+                <span class="title"><lang key="user_old_password"></lang></span>
+                <input class="form-control" name="old-password" type="password" data-match="[name=old-password-check]" required data-required-error="Required." data-match-error="Not match." />
+                <div class="help-block with-errors"></div>
+            </div>
+            <input type="hidden" name="old-password-check" />
+        </form>
+    </div>
+
+    <div class="wizard">
+        <div class="form-title"><lang key="user_edit_input_if_needed"></lang></div>
+        <form class="user" data-toggle="validator">
+            <div class="form-group">
+                <span class="title"><lang key="user_handle_name"></lang></span>
+                <input class="form-control" name="handlename" type="text" />
+                <div class="help-block with-errors"></div>
+            </div>
+            <div class="form-group">
+                <span class="title"><lang key="user_email"></lang></span>
+                <input class="form-control" name="email" type="email" required data-error="Invalid email." data-required-error="Required." />
+                <div class="help-block with-errors"></div>
+            </div>
+            <div class="form-group">
+                <span class="title"><lang key="user_email_confirm"></lang></span>
+                <input class="form-control" name="email-confirm" type="email" data-match="[name=email]" required data-required-error="Required." data-match-error="Not match." />
+                <div class="help-block with-errors"></div>
+            </div>
+            <div class="form-group">
+                <span class="title"><lang key="user_new_password"></lang></span>
+                <input class="form-control" name="new-password" type="password" required data-minlength="8" data-required-error="Required." data-error="Minimum of 8 characters." />
+                <div class="help-block with-errors"></div>
+            </div>
+            <div class="form-group">
+                <span class="title"><lang key="user_new_password_confirm"></lang></span>
+                <input class="form-control" name="new-password-confirm" type="password" data-match="[name=new-password]" required data-required-error="Required." data-match-error="Not match." />
+                <div class="help-block with-errors"></div>
+            </div>
+        </form>
+    </div>
+
+    <div class="wizard">
+        <form class="user" data-toggle="validator">
+            <div class="form-group">
+                <span class="title"><lang key="user_save_data_to_server"></lang></span>
+                <input name="savedatatoserver" type="checkbox" checked style="display: none;" />
+                <div class="savedatatoserver-multi multi">
+                    <button type="button" class="btn btn-default"><lang key="no"></lang></button>
+                    <button type="button" class="btn btn-primary"><lang key="yes"></lang></button>
+                </div>
+                <div class="help-block with-errors"></div>
+            </div>
+            <div class="form-group">
+                <span class="title"><lang key="user_first_day_of_a_week"></lang></span>
+                <input name="calendartype" type="radio" value="0" checked style="display: none;" />
+                <input name="calendartype" type="radio" value="1" style="display: none;" />
+                <div class="calendartype-multi multi">
+                    <button type="button" class="btn btn-primary"><lang key="user_sunday"></lang></button>
+                    <button type="button" class="btn btn-default"><lang key="user_monday"></lang></button>
+                </div>
+                <div class="help-block with-errors"></div>
+            </div>
+            <div class="form-group" style="height: 100px;">
+                <span class="title" style="line-height: 80px;"><lang key="user_icon"></lang></span>
+                <div class="right">
+                    <span class="icon-button btn btn-default"><lang key="user_select_icon"></lang></span>
+                    <img name="icon" class="user-icon" />
+                    <div class="help-block with-errors"></div>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <div class="wizard">
+        <div class="term-container scrollable"><pre></pre></div>
+        <form class="user" data-toggle="validator">
+            <div class="form-group">
+                <span class="title"><lang key="user_agree_terms"></lang></span>
+                <div class="multi">
+                    <button type="button" class="btn btn-primary"><lang key="no"></lang></button>
+                    <button type="button" class="btn btn-default"><lang key="yes"></lang></button>
+                </div>
+                <input name="acceptterm" style="display: none;" type="checkbox" required data-required-error="Required." />
+                <div class="help-block with-errors"></div>
+            </div>
+        </form>
+    </div>
+</script>
+
+<script type="text/html" id="footer">
+    <button class="back-button btn btn-default"><lang key="edit_user_back"></lang></button>
+    <button class="btn btn-default forgot-password-button"><lang key="user_data_migration_forgot_password"></lang></button>
+    <button class="next-button btn btn-default"><lang key="edit_user_next"></lang></button>
+</script>

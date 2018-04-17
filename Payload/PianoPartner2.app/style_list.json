@@ -1,0 +1,220 @@
+﻿{
+	"category": [
+	{
+		"name": "Pops",
+		"name_jp": "ポップス",
+		"style": [
+		{
+			"filename": "001_Pop 1.stl",
+			"name": "8-Beat Pop 1",
+			"name_jp": "8ビート ポップ 1",
+			"tempo": 82,
+			"tempo_notation": 5,
+			"bpm": 82,
+			"beat_numerator": 4,
+			"beat_denominator": 4
+		},
+		{
+			"filename": "008_Pop 2.stl",
+			"name": "8-Beat Pop 2",
+			"name_jp": "8ビート ポップ 2",
+			"tempo": 69,
+			"tempo_notation": 5,
+			"bpm": 69,
+			"beat_numerator": 4,
+			"beat_denominator": 4
+		},
+		{
+			"filename": "009_GoldMedBeat.STL",
+			"name": "8-Beat Pop 3",
+			"name_jp": "8ビート ポップ 3",
+			"tempo": 118,
+			"tempo_notation": 5,
+			"bpm": 118,
+			"beat_numerator": 4,
+			"beat_denominator": 4
+		},
+		{
+			"filename": "010_CoolLiveBand.STL",
+			"name": "8-Beat Acoustic",
+			"name_jp": "8ビート アコースティック",
+			"tempo": 92,
+			"tempo_notation": 5,
+			"bpm": 92,
+			"beat_numerator": 4,
+			"beat_denominator": 4
+		},
+		{
+			"filename": "002_Frank's Way.STL",
+			"name": "8-Beat Ballad",
+			"name_jp": "8ビート バラード",
+			"tempo": 76,
+			"tempo_notation": 5,
+			"bpm": 76,
+			"beat_numerator": 4,
+			"beat_denominator": 4
+		},
+		{
+			"filename": "011_16BtGuitarBand.STL",
+			"name": "16-Beat Acoustic",
+			"name_jp": "16ビート アコースティック",
+			"tempo": 100,
+			"tempo_notation": 5,
+			"bpm": 100,
+			"beat_numerator": 4,
+			"beat_denominator": 4
+		},
+		{
+			"filename": "012_Gold Beat.STL",
+			"name": "16-Beat Ballad",
+			"name_jp": "16ビート バラード",
+			"tempo": 66,
+			"tempo_notation": 5,
+			"bpm": 66,
+			"beat_numerator": 4,
+			"beat_denominator": 4
+		},
+		{
+			"filename": "014_Due Beat.STL",
+			"name": "16-Beat Shuffle",
+			"name_jp": "16ビート シャッフル",
+			"tempo": 99,
+			"tempo_notation": 5,
+			"bpm": 99,
+			"beat_numerator": 4,
+			"beat_denominator": 4
+		},
+		{
+			"filename": "007_Smooth Jazz.stl",
+			"name": "Smooth Pop",
+			"name_jp": "スムース ポップ",
+			"tempo": 100,
+			"tempo_notation": 5,
+			"bpm": 100,
+			"beat_numerator": 4,
+			"beat_denominator": 4
+		},
+		{
+			"filename": "006_Bossa Nova.stl",
+			"name": "Bossa Nova",
+			"name_jp": "ボサノバ",
+			"tempo": 128,
+			"tempo_notation": 5,
+			"bpm": 128,
+			"beat_numerator": 4,
+			"beat_denominator": 4
+		},
+		{
+			"filename": "013_King Blues.stl",
+			"name": "R&B",
+			"name_jp": "R&B",
+			"tempo": 80,
+			"tempo_notation": 5,
+			"bpm": 80,
+			"beat_numerator": 4,
+			"beat_denominator": 4
+		},
+		{
+			"filename": "003_Slow Blues.stl",
+			"name": "Slow Blues",
+			"name_jp": "スロー ブルース",
+			"tempo": 55,
+			"tempo_notation": 5,
+			"bpm": 55,
+			"beat_numerator": 4,
+			"beat_denominator": 4
+		},
+		{
+			"filename": "016_BlueEyesBand.STL",
+			"name": "Big Band",
+			"name_jp": "ビッグバンド",
+			"tempo": 130,
+			"tempo_notation": 5,
+			"bpm": 130,
+			"beat_numerator": 4,
+			"beat_denominator": 4
+		},
+		{
+			"filename": "004_Medium Jazz.stl",
+			"name": "Medium Jazz",
+			"name_jp": "ミディアム ジャズ",
+			"tempo": 122,
+			"tempo_notation": 5,
+			"bpm": 122,
+			"beat_numerator": 4,
+			"beat_denominator": 4
+		},
+		{
+			"filename": "015_Up Jazz.stl",
+			"name": "Up Jazz",
+			"name_jp": "アップ ジャズ",
+			"tempo": 196,
+			"tempo_notation": 5,
+			"bpm": 196,
+			"beat_numerator": 4,
+			"beat_denominator": 4
+		},
+		{
+			"filename": "005_Blue Waltz.stl",
+			"name": "Jazz Waltz 1",
+			"name_jp": "ジャズ ワルツ 1",
+			"tempo": 151,
+			"tempo_notation": 5,
+			"bpm": 151,
+			"beat_numerator": 3,
+			"beat_denominator": 4
+		},
+		{
+			"filename": "021_Jazz Waltz.stl",
+			"name": "Jazz Waltz 2",
+			"name_jp": "ジャズ ワルツ 2",
+			"tempo": 203,
+			"tempo_notation": 5,
+			"bpm": 203,
+			"beat_numerator": 3,
+			"beat_denominator": 4
+		},
+		{
+			"filename": "017_Gold Slow Waltz.STL",
+			"name": "Slow Waltz",
+			"name_jp": "スロー ワルツ",
+			"tempo": 90,
+			"tempo_notation": 3,
+			"bpm": 90,
+			"beat_numerator": 3,
+			"beat_denominator": 4
+		},
+		{
+			"filename": "018_It Valzer.STL",
+			"name": "Medium Waltz",
+			"name_jp": "ミディアム ワルツ",
+			"tempo": 182,
+			"tempo_notation": 5,
+			"bpm": 182,
+			"beat_numerator": 3,
+			"beat_denominator": 4
+		},
+		{
+			"filename": "019_Happy Schlager.STL",
+			"name": "Schlager",
+			"name_jp": "2ビート ポップ",
+			"tempo": 129,
+			"tempo_notation": 5,
+			"bpm": 129,
+			"beat_numerator": 4,
+			"beat_denominator": 4
+		},
+		{
+			"filename": "020_AmazingGospel.STL",
+			"name": "6/8 Gospel",
+			"name_jp": "6/8 ゴスペル",
+			"tempo": 61,
+			"tempo_notation": 5,
+			"bpm": 61,
+			"beat_numerator": 6,
+			"beat_denominator": 8
+		}
+		]
+	}
+	]
+}

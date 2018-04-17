@@ -1,0 +1,755 @@
+<!-- エディタ参照のみの用途 -->
+<head>
+    <link rel="stylesheet" type="text/css" href="../bootstrap-3.3.6-dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" type="text/css" href="../bootstrap-3.3.6-dist/css/bootstrap-theme.min.css" />
+    <link rel="stylesheet" type="text/css" href="../animsition/css/animsition.min.css" />
+    <link rel="stylesheet" type="text/css" href="../css/pp2.css" />
+</head>
+<!-- / -->
+
+<script type="text/javascript">
+    $(function() {
+        PP2_CORE.init(PP2_CORE.applicationModes.FlashCard);
+
+        PP2_PLAYER.pause();
+        PP2_RECORDER.stopAutoRecording();
+
+        // ライフサイクルのコールバック
+        PP2_FRONT.onApplicationStop = function() {
+            PP2_MIDI.stopSequencerAndMetronomeIfNeeded();
+        };
+        PP2_FRONT.onUnload = function() {
+            PP2_MIDI.sendSoundEffectStopAll();
+            clearTimeout(executionTimer);
+            clearTimeout(countDownTimer);
+            PP2_CORE.removeNotSleepTag('flashcard');
+        };
+
+        PP2_MIDI.addCallback(p2addr.eventsMidiDisconnected, function() {
+            PP2_CONTENTS.clear();
+            $('.modal').modal('hide');
+            PP2_FRONT.showModal('error_disconnected', 350);
+        });
+
+        var total = 0;
+        var gameMode = 0;
+        var difficulty = 0;
+        var questions;
+        var usedQuestions = [];
+        var lastQuestion = "";
+        var incorrectCounter = 0;
+        var remainingTime = 24;
+        var executionTimer;
+        var countDownTimer;
+        var isAnswerable = false;
+
+        var setAnswerable = function(value) {
+            isAnswerable = value;
+            if (isAnswerable) {
+                $('.key').removeClass("disabled");
+            } else {
+                $('.key').addClass("disabled");
+            }
+        };
+
+        // デフォルトは回答不可状態にしておく
+        setAnswerable(false);
+
+        $('.key').on('click', function(){
+            if (!isAnswerable) {
+                // 回答不可状態の時は音も鳴らさない
+                return;
+            }
+
+            console.debug('keyClick');
+            var noteNo = $(this).attr('noteNo');
+            console.debug('keyClick noteNo : ' + noteNo);
+            PP2_FLASHCARD.playTone(noteNo);
+
+            PP2_FRONT.scriptPool.answer(noteNo);
+        });
+
+        $('#flashcard-reset').on('click', function(){
+            PP2_FRONT.scriptPool.showFirstDialog();
+        });
+
+        PP2_MIDI.addCallback(p2addr.noteOn, function(params) {
+            PP2_FRONT.scriptPool.answer(params.number.toString(16));
+        });
+
+        // タイマーの目盛り生成＆エレメント保持
+        var timerContainer = $('.timer-container');
+        for (var i = 0; i < 24; i++) {
+            timerContainer.append('<div />');
+        }
+        var timerElements = timerContainer.find('div');
+
+        // 問題番号エレメント保持
+        var questionNumberElements = $('.question-number-container').find('.number');
+
+        // 関数定義
+        PP2_FRONT.scriptPool = {
+            showFirstDialog: (function(){
+                var isShowFirstDialog = false;
+                return function(){
+                    if (isShowFirstDialog) {
+                        return;
+                    }
+                    isShowFirstDialog = true;
+                    console.debug("show flashcard_difficulty");
+                    PP2_FRONT.showModal("flashcard_difficulty", 398);
+
+                    // ゲーム開始時に初期化
+                    clearTimeout(executionTimer);
+                    clearTimeout(countDownTimer);
+                    questionNumberElements.removeClass('current').removeClass('answered');
+                    questions = null;
+                    usedQuestions = [];
+                    lastQuestion = "";
+                    remainingTime = 24;
+                    total = 0;
+                    setAnswerable(false);
+                    $("#flash-card-text").html(PP2_LANGUAGE.getValues().flashcard_guess_and_play);
+                    $('.question_image').attr('src', './images/fc_card_back.png');
+                    $('.answer_image').attr(
+                        'src', PP2_FRONT.scriptPool.getScoreSrc());
+
+                    var keyboardArea = $('#keyboard_area');
+                    var keyboard = $('#keyboard');
+                    keyboardArea.scrollLeft((keyboard.width() - keyboardArea.width()) / 2);
+                    console.log('parentWidth : ' + keyboardArea.width());
+                    console.log('keyboardWidth : ' + keyboard.width());
+                    console.log('scrollLeft : ' + keyboardArea.scrollLeft());
+                    executionTimer = setTimeout(function(){
+                        isShowFirstDialog = false;
+                        isShowFirstDialog = false;
+                    }, 300);
+                }
+            })(),
+            showScoreDialog: function(){
+                console.debug("show flashcard_score");
+                PP2_FRONT.showModal("flashcard_score", 350);
+                PP2_CORE.removeNotSleepTag('flashcard');
+            },
+            countDown: function(){
+                clearTimeout(countDownTimer);
+                if (usedQuestions.length >= 5) {
+                    return;
+                }
+                countDownTimer = setInterval(function(){
+                    console.log("timer : " + remainingTime);
+
+                    timerElements.eq(timerElements.length - remainingTime).removeClass('on');
+                    if (remainingTime === 16) {
+                        timerElements.addClass('yellow');
+                    }
+                    if (remainingTime === 4){
+                        timerElements.addClass('red');
+                    }
+                    if (remainingTime <= 0) {
+                        //時間切れ
+                        clearTimeout(countDownTimer);
+                        setAnswerable(false);
+                        usedQuestions.push(lastQuestion);
+
+                        questionNumberElements.eq(usedQuestions.length - 1).removeClass('current').addClass('answered');
+
+                        if (usedQuestions.length == 5) {
+                            console.log("TimeUp GameEnd");
+                            PP2_FLASHCARD.playSound(p2se.drumRoll);
+                            PP2_FRONT.scriptPool.showScoreDialog();
+                        }else{
+                            console.log("TimeUp Next");
+                            PP2_FLASHCARD.playSound(p2se.incorrect);
+                            $("#flash-card-text").html(PP2_LANGUAGE.getValues().flashcard_timeup);
+                            PP2_FRONT.scriptPool.nextQuestion();
+                        }
+                    }else{
+                        remainingTime--;
+                    }
+                }, 1000 / 3);
+            },
+            sendBaseTone: function(){
+                console.debug("sendBaseTone");
+                var baseTone = '3C';
+                PP2_FLASHCARD.playTone(baseTone, 3000);
+            },
+            setFlashCardMode: function(mode){
+                console.debug("setFlashCardMode:" + mode);
+                gameMode = mode;
+            },
+            getFlashCardMode: function() {
+                return gameMode;
+            },
+            setFlashCardDifficulty: function(nextDifficulty){
+                console.debug("setFlashCardDifficulty:" + nextDifficulty);
+                difficulty = nextDifficulty;
+            },
+            getFlashCardDifficulty: function() {
+                return difficulty;
+            },
+            start: function() {
+                PP2_CORE.addNotSleepTag('flashcard');
+                switch (difficulty) {
+                    case 0:
+                        if (!PP2_MIDI.isConnected()) {
+                            questions = ['3C','3E','40','41','43','45','47','48'];
+                        } else {
+                            questions = ['39', '3B', '3C', '3E', '40', '41', '43', '45', '47', '48'];
+                        }
+                        break;
+                    case 1:
+                        questions = ['24','26','28','29','2B','2D','2F','30','32','34','35','37','39','3B','3C','3E','40','41','43','45','47','48','4A','4C','4D','4F','51','53'];
+                        break;
+                    case 2:
+                        questions = ['24','25','26','27','28','29','2A','2B','2C','2D','2E','2F','30','31','32','33','34','35','36','37','38','39','3A','3B','3C','3D','3E','3F','40','41','42','43','44','45','46','47','48','49','4A','4B','4C','4D','4E','4F','51','52','53'];
+                        break;
+                    default:
+                }
+
+                if (gameMode === 0) {
+                    $("#flash-card-text").html(PP2_LANGUAGE.getValues().flashcard_guess_and_play);
+                    PP2_FRONT.showModal("flashcard_intro", 350);
+                    PP2_FRONT.scriptPool.sendBaseTone();
+                } else {
+                    $("#flash-card-text").html(PP2_LANGUAGE.getValues().flashcard_lets_play);
+                    PP2_FRONT.scriptPool.nextQuestion();
+                }
+            },
+            nextQuestion: (function() {
+                return function() {
+                    timerElements.addClass('on').removeClass('yellow').removeClass('red');
+                    questionNumberElements.eq(usedQuestions.length).addClass('current');
+
+                    console.debug("nextQuestion call");
+                    incorrectCounter = 0;
+                    remainingTime = 24;
+                    executionTimer = setTimeout(function(){
+                        // カードめくりアニメーション
+                        var slideCardAnimation = function(baseImage, surfaceImage, toRight) {
+                            var baseImageLeft = parseInt(baseImage.css('left'), 10);
+                            surfaceImage.attr('src', baseImage.attr('src'));
+                            surfaceImage.css({left: baseImageLeft + 'px', opacity: 1});
+                            surfaceImage.show();
+                            surfaceImage.animate({left: baseImageLeft + (toRight ? 180 : -180) + 'px', opacity: 0});
+                        };
+                        if (usedQuestions.length > 0) {
+                            slideCardAnimation($('.question_image'), $('.question_image_surface'), false);
+                            slideCardAnimation($('.answer_image'), $('.answer_image_surface'), true);
+                        }
+
+                        $('.answer_image').attr('src', PP2_FRONT.scriptPool.getScoreSrc());
+                        if (gameMode === 0) {
+                            $('.question_image').attr('src', './images/fc_card_back.png');
+                        }
+
+                        usedQuestions.forEach(function(val){
+                            questions = _.without(questions, val);
+                        });
+                        console.info("nextQuestion usedQuestions : " + usedQuestions);
+                        console.info("nextQuestion questions : " + questions);
+                        lastQuestion = questions[Math.floor(Math.random() * questions.length)];
+                        console.debug("nextQuestion play " + lastQuestion);
+                        if (gameMode === 0) {
+                            PP2_FLASHCARD.playTone(lastQuestion, 3000);
+                            $("#flash-card-text").html(PP2_LANGUAGE.getValues().flashcard_guess_and_play);
+                        }else{
+                            PP2_FRONT.scriptPool.drawScore($('.question_image'), lastQuestion);
+                            $("#flash-card-text").html(PP2_LANGUAGE.getValues().flashcard_lets_play);
+                        }
+                        executionTimer = setTimeout(function(){
+                            PP2_FRONT.scriptPool.countDown();
+                            setAnswerable(true);
+                        }, 300);
+                    }, 1000);
+                };
+            })(),
+            answer: function(noteNo){
+                if (!isAnswerable) {
+                    return;
+                }
+
+                PP2_FRONT.scriptPool.drawScore($('.answer_image'), noteNo);
+                var isCorrect = parseInt(lastQuestion, 16) == parseInt(noteNo, 16);
+                console.log(isCorrect ? 'correct' : 'incorrect');
+
+                if (isCorrect || incorrectCounter >= 2) {
+                    // 正解or3回間違えたら終了
+                    setAnswerable(false);
+                    clearTimeout(countDownTimer);
+                    usedQuestions.push(lastQuestion);
+                    $("#flash-card-text").html(isCorrect ? PP2_LANGUAGE.getValues().flashcard_right : PP2_LANGUAGE.getValues().flashcard_wrong);
+                    executionTimer = setTimeout(function(){
+                        if (gameMode === 0) {
+                            PP2_FRONT.scriptPool.drawScore($('.question_image'), lastQuestion);
+                        }
+
+                        executionTimer = setTimeout(function() {
+                            questionNumberElements.eq(usedQuestions.length - 1).removeClass('current').addClass('answered');
+                            PP2_FLASHCARD.playSound(isCorrect ? p2se.correct : p2se.incorrect);
+                            if (isCorrect) {
+                                total += PP2_FRONT.scriptPool.calculatePoint(incorrectCounter, remainingTime);
+                                console.debug("question total : " + total);
+                            }
+
+                            executionTimer = setTimeout(function () {
+                                if (usedQuestions.length === 5) {
+                                    executionTimer = setTimeout(function () {
+                                        PP2_FLASHCARD.playSound(p2se.drumRoll);
+                                        PP2_FRONT.scriptPool.showScoreDialog();
+                                    }, 1000);
+                                } else {
+                                    PP2_FRONT.scriptPool.nextQuestion();
+                                }
+                            }, 300);
+                        }, 300);
+                    }, 1000);
+                } else {
+                    // 3回未満の間違いなら続行
+                    incorrectCounter++;
+                    var hint = PP2_FRONT.scriptPool.getHint(noteNo);
+                    $("#flash-card-text").html(hint);
+                }
+            },
+            getHint: function(select){
+                var note = parseInt(select, 16);
+                var lq = parseInt(lastQuestion, 16);
+
+                var hint;
+                if (note > lq) {
+                    hint = PP2_LANGUAGE.getValues().flashcard_lower;
+                }else{
+                    hint = PP2_LANGUAGE.getValues().flashcard_heigher;
+                }
+                return hint;
+            },
+            calculatePoint: function(corectTiming, timeCounter){
+                var point = 20;
+                var elapsedTime = Math.floor(8 - (timeCounter / 3));
+                console.debug("question time : " + elapsedTime);
+                switch (elapsedTime) {
+                    case 4:
+                        point -= 1;
+                        break;
+                    case 5:
+                        point -= 2;
+                        break;
+                    case 6:
+                        point -= 3;
+                        break;
+                    case 7:
+                    case 8:
+                        point -= 5;
+                        break;
+                    default:
+                }
+
+                point -= corectTiming * 5;
+                console.debug("question point : " + point);
+                return point;
+            },
+            setScoreComment: function(text){
+                var comment;
+                if(total >= 100){
+                    comment = PP2_LANGUAGE.getValues().flashcard_comment_excellent;
+                }else if(total >= 90){
+                    comment = PP2_LANGUAGE.getValues().flashcard_comment_welldone;
+                }else if(total >= 80){
+                    comment = PP2_LANGUAGE.getValues().flashcard_comment_good;
+                }else if(total >= 50){
+                    comment = PP2_LANGUAGE.getValues().flashcard_comment_notbad;
+                }else {
+                    comment = PP2_LANGUAGE.getValues().flashcard_comment_bad;
+                }
+                text.html(comment);
+            },
+            setRandomPoint: function(text){
+                var rand1 = Math.floor(Math.random() * 10);
+                var rand2 = Math.floor(Math.random() * 10);
+                text.html(String(rand1) + rand2);
+            },
+            getScoreSrc: function(noteNo){
+                var canvas = $('<canvas />')[0];
+                var ctx = canvas.getContext('2d');
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                var preloadImages = PP2_FLASHCARD.getPreloadImages();
+
+                canvas.width = preloadImages.card_front.width;
+                canvas.height = preloadImages.card_front.height;
+                ctx.drawImage(preloadImages.card_front, 0, 0);
+
+                // 起点はC4、0以上はト音、0未満はヘ音
+                var drawNote = function(position, needToNotation) {
+                    var isTreble = 0 <= position;
+                    if (undefined === position || isTreble) {
+                        ctx.drawImage(preloadImages.clef_treble, 0, 45);
+                        if (undefined === position) {
+                            return;
+                        }
+                    } else {
+                        ctx.drawImage(preloadImages.clef_bass, 0, 45);
+                    }
+
+                    // 足りない線の描画
+                    if (14 <= position) {
+                        drawShortLine(14, isTreble);
+                    }
+                    if (12 <= position) {
+                        drawShortLine(49, isTreble);
+                    }
+                    if (position === 0 || position <= -12) {
+                        drawShortLine(259, isTreble);
+                    }
+                    if (position <= -14) {
+                        drawShortLine(294, isTreble);
+                    }
+
+                    if (6 <= position) {
+                        ctx.drawImage(preloadImages.note_reverse, 135, 243.5 - position * 17.5);
+                    } else if (0 <= position) {
+                        ctx.drawImage(preloadImages.note, 135, 156 - position * 17.5);
+                    } else if (-6 <= position) {
+                        ctx.drawImage(preloadImages.note_reverse, 150, 33.5 - position * 17.5);
+                    } else {
+                        ctx.drawImage(preloadImages.note, 150, -54 - position * 17.5);
+                    }
+
+                    // シャープとフラットの描画
+                    if (needToNotation) {
+                        switch((position + 70) % 7) {
+                                // sharp
+                            case 0:
+                            case 3:
+                            case 4:
+                                if (0 <= position) {
+                                    ctx.drawImage(preloadImages.sharp, 100, 220 - position * 17.5);
+                                } else {
+                                    ctx.drawImage(preloadImages.sharp, 115, 10 - position * 17.5);
+                                }
+                                break;
+                                // flat
+                            case 2:
+                            case 6:
+                                if (0 <= position) {
+                                    ctx.drawImage(preloadImages.flat, 100, 205 - position * 17.5);
+                                } else {
+                                    ctx.drawImage(preloadImages.flat, 115, -10 - position * 17.5);
+                                }
+                                break;
+                        }
+                    }
+                };
+
+                var drawShortLine = function(y, isTreble) {
+                    ctx.fillStyle = '#18191A';
+                    ctx.fillRect(130 + (isTreble ? 0 : 15), y, 50, 2);
+                };
+
+
+                if (noteNo !== undefined) {
+                    console.debug("noteNo : " + noteNo);
+                    var parseNo = parseInt(noteNo, 16);
+
+                    // C4を0としたオクターブ
+                    var oct = Math.floor((parseNo - 60) / 12);
+
+                    var soundNo = parseNo % 12;
+                    switch (soundNo) {
+                        case 0://ド
+                        case 1://ド♯
+                            console.debug("create C = oct : " + oct + " parsed : " + parseNo%12);
+                            drawNote(oct * 7, soundNo === 1);
+                            break;
+                        case 2://レ
+                            console.debug("create D = oct : " + oct + " parsed : " + parseNo%12);
+                            drawNote(oct * 7 + 1);
+                            break;
+                        case 3://ミ♭
+                        case 4://ミ
+                            console.debug("create E = oct : " + oct + " parsed : " + parseNo%12);
+                            drawNote(oct * 7 + 2, soundNo === 3);
+                            break;
+                        case 5://ファ
+                        case 6://ファ♯
+                            console.debug("create F = oct : " + oct + " parsed : " + parseNo%12);
+                            drawNote(oct * 7 + 3, soundNo === 6);
+                            break;
+                        case 7://ソ
+                        case 8://ソ♯
+                            console.debug("create G = oct : " + oct + " parsed : " + parseNo%12);
+                            drawNote(oct * 7 + 4, soundNo === 8);
+                            break;
+                        case 9://ラ
+                            console.debug("create A = oct : " + oct + " parsed : " + parseNo%12);
+                            drawNote(oct * 7 + 5);
+                            break;
+                        case 10://シ♭
+                        case 11://シ
+                            console.debug("create B = oct : " + oct + " parsed : " + parseNo%12);
+                            drawNote(oct * 7 + 6, soundNo === 10);
+                            break;
+                        default:
+                    }
+                } else {
+                    console.debug('create base image');
+                    drawNote();
+                }
+                return canvas.toDataURL();
+            },
+            drawScore: function(target, noteNo) {
+                var src = PP2_FRONT.scriptPool.getScoreSrc(noteNo);
+                target.attr('src', src);
+                console.debug("drawScore");
+            },
+            setTotalPoint: function(text){
+                if (total >= 80) {
+                    PP2_FLASHCARD.playSound(p2se.clap);
+                }
+                text.html(total);
+            }
+        }
+
+        var runner = function() {
+            if (!PP2_FLASHCARD.isPreloadFinished()) {
+                executionTimer = setTimeout(runner, 100);
+                return;
+            }
+            PP2_FRONT.scriptPool.showFirstDialog();
+        };
+        runner();
+
+        var needHeight = 415;
+        var usableHeight = window.innerHeight - 120 - $('#keyboard_area').height();
+        if (usableHeight < needHeight) {
+            var upperContainer = $('.flash-card-upper-container');
+            var scale = usableHeight / needHeight;
+            upperContainer.css({transform: _.sprintf('scale(%f, %f)', scale, scale)})
+        }
+
+        if (!PP2_MIDI.isConnected()) {
+            $('#flashcard-settings-handler-icon').remove();
+        }
+    });
+</script>
+
+<style type="text/css">
+    #flashcard-reset {
+        width: 152px;
+        height: 42px;
+        background: url('./images/btn_reset.png');
+        margin: 0;
+    }
+    /* 上段共通 */
+    .flash-card-upper-container {
+        position: absolute;
+        top: 0;
+        right: 0;
+        left: 0;
+        bottom: 0;
+        transform-origin: center top;
+        -webkit-transform-origin: center top;
+    }
+    .question-number-container, .question_image, .question_image_surface, .answer_image, .answer_image_surface, .timer-container {
+        position: absolute;
+        top: 87px;
+    }
+    /* 問題番号 */
+    .question-number-container {
+        left: 72px;
+        width: 65px;
+        height: 306px;
+        border-top: solid 1px #9E9FA0;
+        border-bottom: solid 1px #9E9FA0;
+    }
+    .question-number-container .border {
+        margin: 0;
+        padding: 0;
+        height: 1px;
+        background: #9E9FA0;
+    }
+    .question-number-container .number {
+        width: 50px;
+        height: 50px;
+        margin: 5px 7.5px;
+        padding-left: 1px;
+        line-height: 50px;
+        font-size: 16px;
+        background-position: center center !important;
+        background-repeat: no-repeat;
+        background: none;
+    }
+    .question-number-container .number.answered {
+        background: url("./images/fc_answered_question.png") no-repeat;
+    }
+    .question-number-container .number.current {
+        color: #F37321;
+        background: url("./images/fc_current_question.png");
+    }
+    /* カード */
+    .question_image, .question_image_surface {
+        left: 187px;
+        width: 220px;
+        height: 310px;
+    }
+    .answer_image, .answer_image_surface {
+        left: 617px;
+        width: 220px;
+        height: 310px;
+    }
+    .question_image_surface, .answer_image_surface {
+        z-index: 1;
+        display: none;
+    }
+    /* タイマー */
+    .timer-container {
+        left: 447px;
+        width: 130px;
+        height: 306px;
+        border-top: solid 1px #9E9FA0;
+        border-bottom: solid 1px #9E9FA0;
+    }
+    .timer-container img {
+        display: block;
+        margin: 14px auto 11px auto;
+    }
+    .timer-container div {
+        width: 23px;
+        height: 5px;
+        margin: 5px auto;
+        background: url("./images/img_bar_gray.png");
+    }
+    .timer-container div.on {
+        background: url("./images/img_bar_green.png");
+    }
+    .timer-container div.on.yellow {
+        background: url("./images/img_bar_yellow.png");
+    }
+    .timer-container div.on.red {
+        background: url("./images/img_bar_red.png");
+    }
+    /* キーボード */
+    #keyboard_area {
+        position: absolute;
+        right: 0;
+        bottom: 0;
+        left: 0;
+        height: 30.8%;
+        background: #18191A;
+    }
+    #keyboard_area .key.white {
+        float: left;
+        background: url("./images/key_white.png");
+        background-repeat: no-repeat;
+        background-size: 100% 100%;
+        display: inline-block;
+        width: 50px;
+        height: 100%;
+        margin: 0;
+    }
+    #keyboard_area .key.black {
+        background: url("./images/key_black.png");
+        background-repeat: no-repeat;
+        background-size: 100% 100%;
+        position: absolute;
+        top: 0px;
+        width: 25px;
+        height: 53%;
+        z-index: 1;
+    }
+    #keyboard_area .key.white:active:not(.disabled) {
+        opacity: 0.5;
+    }
+    #keyboard_area .key.black:active:not(.disabled) {
+        background: black;
+        border-bottom-left-radius: 3px;
+        border-bottom-right-radius: 3px;
+    }
+</style>
+
+<script type="text/html" id="header">
+    <div class="float-left">
+        <button id="flashcard-reset" class="btn btn-lg btn-default"><lang key="flashcard_reset"/></button>
+    </div>
+    <div class="float-right">
+        <button id="flashcard-settings-handler-icon" class="icbtn icbtn-remotecontroller" onclick="PP2_FRONT.showRightModal('settings_handler', 1000);"></button>
+    </div>
+</script>
+
+<script type="text/html" id="body">
+    <div class="flash-card-upper-container">
+        <div id="flash-card-text" class="abs t0 r0 l0" style="height: 87px;line-height: 87px;font-size: 25px"></div>
+        <div class="question-number-container">
+            <div class="number">1</div>
+            <div class="border"></div>
+            <div class="number">2</div>
+            <div class="border"></div>
+            <div class="number">3</div>
+            <div class="border"></div>
+            <div class="number">4</div>
+            <div class="border"></div>
+            <div class="number">5</div>
+        </div>
+        <img src="./images/fc_card_back.png" class="question_image"/>
+        <img class="question_image_surface" />
+        <div class="timer-container">
+            <img src="./images/icon_timer.png" />
+        </div>
+        <img class="answer_image"/>
+        <img class="answer_image_surface"/>
+    </div>
+
+    <div id="keyboard_area" class="scrollable-x">
+        <div class="rel" style="padding: 20px 30px;width: 1460px;height: 100%;">
+            <div id="keyboard" style="position: absolute;width: 1400px;top: 20px; left: 30px;bottom: 20px;">
+                <div class="key white" noteNo="24"></div>
+                <div class="key black" noteNo="25" style="left: 37px;"></div>
+                <div class="key white" noteNo="26"></div>
+                <div class="key black" noteNo="27" style="left: 87px;"></div>
+                <div class="key white" noteNo="28"></div>
+                <div class="key white" noteNo="29"></div>
+                <div class="key black" noteNo="2A" style="left: 187px;"></div>
+                <div class="key white" noteNo="2B"></div>
+                <div class="key black" noteNo="2C" style="left: 237px;"></div>
+                <div class="key white" noteNo="2D"></div>
+                <div class="key black" noteNo="2E" style="left: 287px;"></div>
+                <div class="key white" noteNo="2F"></div>
+                <div class="key white" noteNo="30"></div>
+                <div class="key black" noteNo="31" style="left: 387px;"></div>
+                <div class="key white" noteNo="32"></div>
+                <div class="key black" noteNo="33" style="left: 437px;"></div>
+                <div class="key white" noteNo="34"></div>
+                <div class="key white" noteNo="35"></div>
+                <div class="key black" noteNo="36" style="left: 537px;"></div>
+                <div class="key white" noteNo="37"></div>
+                <div class="key black" noteNo="38" style="left: 587px;"></div>
+                <div class="key white" noteNo="39"></div>
+                <div class="key black" noteNo="3A" style="left: 637px;"></div>
+                <div class="key white" noteNo="3B"></div>
+                <div class="key white" noteNo="3C"></div>
+                <div class="key black" noteNo="3D" style="left: 737px;"></div>
+                <div class="key white" noteNo="3E"></div>
+                <div class="key black" noteNo="3F" style="left: 787px;"></div>
+                <div class="key white" noteNo="40"></div>
+                <div class="key white" noteNo="41"></div>
+                <div class="key black" noteNo="42" style="left: 887px;"></div>
+                <div class="key white" noteNo="43"></div>
+                <div class="key black" noteNo="44" style="left: 937px;"></div>
+                <div class="key white" noteNo="45"></div>
+                <div class="key black" noteNo="46" style="left: 987px;"></div>
+                <div class="key white" noteNo="47"></div>
+                <div class="key white" noteNo="48"></div>
+                <div class="key black" noteNo="49" style="left: 1087px;"></div>
+                <div class="key white" noteNo="4A"></div>
+                <div class="key black" noteNo="4B" style="left: 1137px;"></div>
+                <div class="key white" noteNo="4C"></div>
+                <div class="key white" noteNo="4D"></div>
+                <div class="key black" noteNo="4E" style="left: 1237px;"></div>
+                <div class="key white" noteNo="4F"></div>
+                <div class="key black" noteNo="50" style="left: 1287px;"></div>
+                <div class="key white" noteNo="51"></div>
+                <div class="key black" noteNo="52" style="left: 1337px;"></div>
+                <div class="key white" noteNo="53"></div>
+            </div>
+        </div>
+</script>

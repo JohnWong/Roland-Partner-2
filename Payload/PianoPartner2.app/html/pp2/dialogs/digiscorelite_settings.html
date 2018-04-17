@@ -1,0 +1,88 @@
+<!-- エディタ参照のみの用途 -->
+<head>
+    <link rel="stylesheet" type="text/css" href="../../bootstrap-3.3.6-dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" type="text/css" href="../../bootstrap-3.3.6-dist/css/bootstrap-theme.min.css" />
+    <link rel="stylesheet" type="text/css" href="../../animsition/css/animsition.min.css" />
+    <link rel="stylesheet" type="text/css" href="../../css/pp2.css" />
+</head>
+<!-- / -->
+
+<script type="text/javascript">
+    $(function() {
+        var refleshScorePageTurnButton = function() {
+            var buttons = $('#score-page-turn-btn-container').find('button');
+            buttons.removeClass('btn-primary').addClass('btn-default');
+            $(buttons[PP2_SAVEDATA.data.digiScoreLite.pageTurn ? 1 : 0]).removeClass('btn-default').addClass('btn-primary');
+        };
+
+        PP2_FRONT.scriptPool.setScorePageTurn = function(value) {
+            PP2_SAVEDATA.data.digiScoreLite.pageTurn = value;
+            PP2_MIDI.sendSorePageTurn(value);
+            refleshScorePageTurnButton();
+        };
+
+        // スライダー設定
+        var offsetIntervalSlider = PP2_FRONT.initSliderWithoutMIDIConnection($("#offset-interval"), $('#offset-interval-value'), {max: 10}, function(v) {
+            v -= 5;
+            return v > 0 ? ('+' + v) : v;
+        }, function(v) {
+            PP2_DIGISCORE.setOffsetInterval(v);
+            PP2_SAVEDATA.data.digiScoreLite.offsetInterval = v;
+        });
+        PP2_FRONT.setupSliderHelperButton(offsetIntervalSlider, function(params) {
+            offsetIntervalSlider.onValueChanged(params.value);
+        });
+
+        offsetIntervalSlider.setValue(PP2_SAVEDATA.data.digiScoreLite.offsetInterval);
+        PP2_DIGISCORE.setOffsetInterval(PP2_SAVEDATA.data.digiScoreLite.offsetInterval);
+
+        // モーダルクローズ時の処理
+        PP2_FRONT.modalCloseCallback = function() {
+        };
+
+        refleshScorePageTurnButton();
+    });
+</script>
+
+<style type="text/css">
+    #score-page-turn-btn-container button {
+        width: 80px;
+    }
+    span#offset-interval-value {
+        color: #5A5B5C;
+        font-weight: normal;
+    }
+    .slider.slider-horizontal {
+        width: 254px;
+        margin: 10px 73px 10px 73px;
+    }
+</style>
+
+<script type="text/html" id="header">
+    <lang key="digiscorelite_settings"></lang>
+</script>
+
+<script type="text/html" id="body">
+    <table class="table data-table options-table">
+        <tbody>
+        <tr>
+            <th><lang key="page_turn"></lang></th>
+            <td id="score-page-turn-btn-container" class="multi">
+                <button class="btn btn-default" onclick="PP2_FRONT.scriptPool.setScorePageTurn(false);"><lang key="off"></lang></button><!--
+                --><button class="btn btn-default" onclick="PP2_FRONT.scriptPool.setScorePageTurn(true);"><lang key="on"></lang></button>
+            </td>
+        </tr>
+        <tr>
+            <th colspan="2" class="noborder"><lang key="offset_interval"></lang>&nbsp;<span id="offset-interval-value"></span></th>
+        </tr>
+        <tr>
+            <td colspan="2" style="padding: 0;">
+                <input id="offset-interval" type="text" />
+            </td>
+        </tr>
+        </tbody>
+    </table>
+</script>
+
+<script type="text/html" id="footer">
+</script>

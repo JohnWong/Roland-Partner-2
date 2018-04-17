@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=1024, user-scalable=no" />
+    <title>Top</title>
+    <link rel="stylesheet" type="text/css" href="bootstrap-3.3.6-dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" type="text/css" href="bootstrap-3.3.6-dist/css/bootstrap-theme.min.css" />
+    <link rel="stylesheet" type="text/css" href="bootstrap-slider/css/bootstrap-slider.min.css" />
+    <link rel="stylesheet" type="text/css" href="bootstrap-select/css/bootstrap-select.min.css" />
+    <link rel="stylesheet" type="text/css" href="animsition/css/animsition.min.css" />
+    <link rel="stylesheet" type="text/css" href="simpleCalendar/jquery.simpleCalendar.css" />
+    <link rel="stylesheet" type="text/css" href="css/pp2.css" />
+    <script src="promise-polyfill/promise.min.js"></script>
+    <script src="aws/cognito/aws-cognito-sdk.min.js"></script>
+    <script src="aws/cognito/amazon-cognito-identity.min.js"></script>
+    <script src="aws/aws-sdk.min.js"></script>
+    <script src="aws/apiGateway-js-sdk/lib/axios/dist/axios.standalone.js"></script>
+    <script src="aws/apiGateway-js-sdk/lib/CryptoJS/rollups/hmac-sha256.js"></script>
+    <script src="aws/apiGateway-js-sdk/lib/CryptoJS/rollups/sha256.js"></script>
+    <script src="aws/apiGateway-js-sdk/lib/CryptoJS/components/hmac.js"></script>
+    <script src="aws/apiGateway-js-sdk/lib/CryptoJS/components/enc-base64.js"></script>
+    <script src="aws/apiGateway-js-sdk/lib/url-template/url-template.js"></script>
+    <script src="aws/apiGateway-js-sdk/lib/apiGatewayCore/sigV4Client.js"></script>
+    <script src="aws/apiGateway-js-sdk/lib/apiGatewayCore/apiGatewayClient.js"></script>
+    <script src="aws/apiGateway-js-sdk/lib/apiGatewayCore/simpleHttpClient.js"></script>
+    <script src="aws/apiGateway-js-sdk/lib/apiGatewayCore/utils.js"></script>
+    <script src="aws/apiGateway-js-sdk/apigClient.js"></script>
+    <script src="CryptoJS/aes.js"></script>
+    <script src="CryptoJS/pbkdf2.js"></script>
+    <script src="js/jquery.js"></script>
+    <script src="js/lib/underscore-min.js"></script>
+    <script src="js/lib/underscore.string.min.js"></script>
+    <script src="bootstrap-3.3.6-dist/js/bootstrap.min.js"></script>
+    <script src="bootstrap-slider/bootstrap-slider.min.js"></script>
+    <script src="bootstrap-select/js/bootstrap-select.min.js"></script>
+    <script src="animsition/js/animsition.min.js"></script>
+    <script src="simpleCalendar/jquery.simpleCalendar.min.js"></script>
+    <script src="js/lib/fastclick.min.js"></script>
+    <script src="jasmid/stream.js"></script>
+    <script src="jasmid/midifile.js"></script>
+    <script src="fecha/fecha.min.js"></script>
+    <script src="js/lib/validator.min.js"></script>
+    <script src="js/lib/jsmidgen.js"></script>
+    <script src="js/lib/Chart.min.js"></script>
+    <script src="js/native.js"></script>
+    <script src="js/pp2_core.js"></script>
+    <script src="js/pp2_player.js"></script>
+    <script src="js/pp2_recorder.js"></script>
+    <script src="js/pp2_front.js"></script>
+    <script src="js/pp2_language.js"></script>
+    <script src="js/pp2_midi.js"></script>
+    <script src="js/pp2_arranger.js"></script>
+    <script src="js/pp2_digiscore.js"></script>
+    <script src="js/pp2_flashcard.js"></script>
+    <script src="js/pp2_savedata.js"></script>
+    <script src="js/pp2_contents.js"></script>
+    <script src="js/pp2_db.js"></script>
+    <script src="js/pp2_aws.js"></script>
+    <script src="js/pp2_db_aws_handler.js"></script>
+    <script src="js/pp2_crypto.js"></script>
+    <script src="js/pp2_debug.js"></script>
+    <style type="text/css">
+        @font-face {
+            font-family: "CustomFont";
+            src: url("./font/mplus-2p-light.ttf");
+        }
+    </style>
+</head>
+<script type="text/javascript">
+    $(function() {
+        PP2_CORE.initialize();
+        PP2_MIDI.setArrangerBalance(64);
+        PP2_FRONT.global.arrangerBalance = 64;
+    });
+</script>
+
+<body style="font-family: 'CustomFont';">
+<div id="icbtn-preloader"></div>
+</body>
+</html>

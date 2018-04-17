@@ -1,0 +1,107 @@
+<!-- エディタ参照のみの用途 -->
+<head>
+    <link rel="stylesheet" type="text/css" href="../../bootstrap-3.3.6-dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" type="text/css" href="../../bootstrap-3.3.6-dist/css/bootstrap-theme.min.css" />
+    <link rel="stylesheet" type="text/css" href="../../animsition/css/animsition.min.css" />
+    <link rel="stylesheet" type="text/css" href="../../css/pp2.css" />
+</head>
+<!-- / -->
+
+<script type="text/javascript">
+    $(function() {
+        var oneMinuteIndexToTime = function(oneMinuteIndex) {
+            var date = new Date(oneMinuteIndex * 60000);
+            return fecha.format(date, 'HH:mm');
+        };
+
+        var currentActivity = PP2_FRONT.scriptPool.diaryRightContentIF.getActivity();
+        var countsPerTimePeriod = JSON.parse(currentActivity.countsPerTimePeriod);
+        var data = {
+            labels: [],
+            datasets: [{
+                label: 'Very soft',
+                backgroundColor: '#3b9484',
+                data: []
+            }, {
+                label: 'Soft',
+                backgroundColor: '#A5CC52',
+                data: []
+            }, {
+                label: 'Medium',
+                backgroundColor: '#FCD465',
+                data: []
+            }, {
+                label: 'Strong',
+                backgroundColor: '#F2B361',
+                data: []
+            }, {
+                label: 'Very strong',
+                backgroundColor: '#FF6669',
+                data: []
+            }]
+        };
+        for (var oneMinuteIndex = Math.floor(new Date(currentActivity.startAt).getTime() / 60000); oneMinuteIndex < (new Date(currentActivity.endAt).getTime() / 60000); oneMinuteIndex++) {
+            data.labels.push(oneMinuteIndexToTime(oneMinuteIndex));
+            for (var velocityLevel = 0; velocityLevel < 5; velocityLevel++) {
+                var value = 0;
+                for (var i = 0; i < 6; i++) {
+                    if (undefined !== countsPerTimePeriod[oneMinuteIndex * 6 + i]) {
+                        value += countsPerTimePeriod[oneMinuteIndex * 6 + i][velocityLevel];
+                    }
+                }
+                data.datasets[velocityLevel].data.push(value);
+            }
+        }
+        var ctx = $('#diary-right-content-per-time-period-graph-canvas')[0].getContext("2d");
+        new Chart(ctx, {
+            type: 'bar',
+            data: data,
+            options: {
+                maintainAspectRatio: false,
+                title:{
+                    display: false,
+                    text: ""
+                },
+                tooltips: {
+                    mode: 'index',
+                    intersect: false
+                },
+                responsive: true,
+                scales: {
+                    xAxes: [{
+                        stacked: true,
+                    }],
+                    yAxes: [{
+                        stacked: true
+                    }]
+                },
+                legend: {
+                    position: 'bottom'
+                }
+            }
+        });
+    });
+</script>
+
+<style type="text/css">
+    .diary-right-content-per-time-period-graph-canvas-container {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        bottom: 0;
+        left: 10px;
+    }
+    #diary-right-content-per-time-period-graph-canvas {
+        position: absolute;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        left: 0;
+    }
+</style>
+
+<script type="text/html" id="body">
+    <div class="diary-right-content-per-time-period-graph-canvas-container">
+        <canvas id="diary-right-content-per-time-period-graph-canvas"></canvas>
+    </div>
+</script>

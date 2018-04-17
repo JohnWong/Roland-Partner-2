@@ -1,0 +1,146 @@
+<!-- エディタ参照のみの用途 -->
+<head>
+    <link rel="stylesheet" type="text/css" href="../bootstrap-3.3.6-dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" type="text/css" href="../bootstrap-3.3.6-dist/css/bootstrap-theme.min.css" />
+    <link rel="stylesheet" type="text/css" href="../animsition/css/animsition.min.css" />
+    <link rel="stylesheet" type="text/css" href="../css/pp2.css" />
+</head>
+<!-- / -->
+
+<script type="text/javascript">
+    $(function() {
+        var selectedCategory;
+        var selectedSong;
+
+        PP2_CORE.init(PP2_CORE.applicationModes.Songs);
+
+        PP2_RECORDER.startAutoRecording();
+
+        PP2_FRONT.onUnload = function() {
+            PP2_CORE.removeNotSleepTag('piano_player');
+        };
+
+        PP2_MIDI.addCallback(p2addr.eventsMidiDisconnected, function() {
+            PP2_CONTENTS.clear();
+            $('.modal').modal('hide');
+            PP2_FRONT.showModal('error_disconnected', 350);
+        });
+
+        PP2_MIDI.addCallback(p2addr.songNumber, function(params) {
+            // 範囲外のcategoryNoが来た場合は補正
+            params.categoryNo = params.categoryNo > PP2_CONTENTS.getSongList().category.length ? 0 : params.categoryNo;
+            if (params.categoryNo != 0) {
+                selectedCategory = PP2_CONTENTS.getSongList().category[params.categoryNo - 1];
+                selectedSong = selectedCategory.song[params.number];
+            }else{
+                selectedCategory = undefined;
+                selectedSong = undefined;
+            }
+
+            reloadCategories();
+            reloadSongs(selectedCategory);
+        });
+
+        var reloadCategories = function() {
+            var categories = $('#categories-table').find('tbody');
+            categories.empty();
+            _.forEach(PP2_CONTENTS.getSongList().category, function (category) {
+                var td = $('<td />').html(PP2_LANGUAGE.isSongToneLanguageJa() ? category.name_jp : category.name)
+                var tr = $('<tr />').on('click', function () {
+                    $(this).parent().find('.info').removeClass('info');
+                    $(this).addClass('info');
+                    selectedCategory = category;
+                    reloadSongs(category);
+                });
+                if (selectedCategory != undefined && category.name == selectedCategory.name) {
+                    tr.addClass('info');
+                }
+                tr.append(td).appendTo(categories);
+            });
+        };
+
+        var previousCategory;
+        var previousIsJa;
+        var reloadSongs = function(category) {
+            var songs = $('#songs-table').find('tbody');
+            var tableContainer = songs.parent().parent();
+            if (previousCategory != category || previousIsJa != PP2_LANGUAGE.isSongToneLanguageJa()) {
+                songs.empty();
+                if (category != undefined) {
+                    $('#category-name').html(PP2_LANGUAGE.isSongToneLanguageJa() ? category.name_jp : category.name);
+                    var songNo = 1;
+                    _.forEach(category.song, function (song) {
+                        var td = $('<td />').html((songNo++) + '.&nbsp;&nbsp;' + (PP2_LANGUAGE.isSongToneLanguageJa() ? song.name_jp : song.name));
+                        var tr = $('<tr />').on('click', function () {
+                            var self = this;
+                            setTimeout(function() {
+                                // ディレイ無しで実行するとiOSリストスクロール中にタップした際表示がバグるため、ディレイをかける
+                                $(self).parent().find('.info').removeClass('info');
+                                $(self).addClass('info');
+                            }, 30);
+
+                            selectedSong = song;
+                            var categoryNo = _.findIndex(PP2_CONTENTS.getSongList().category, {name: selectedCategory.name}) + 1;
+                            var songNo = _.findIndex(selectedCategory.song, {filename: song.filename});
+                            PP2_MIDI.setSong(categoryNo, songNo);
+                            PP2_FRONT.scriptPool.playerIF.setSong({categoryNo: categoryNo, number: songNo});
+                        });
+                        tr.append(td).appendTo(songs);
+                        if (selectedSong != undefined && song.filename == selectedSong.filename) {
+                            tr.addClass('info');
+                            PP2_FRONT.scrollToTargetIfNeeded(tableContainer, tr);
+                        }
+                    });
+                }else{
+                    $('#category-name').html('&nbsp;');
+                }
+            } else {
+                songs.find('.info').removeClass('info');
+                var tr = $(songs.find('tr')[_.findIndex(category.song, selectedSong)]);
+                tr.addClass('info');
+                PP2_FRONT.scrollToTargetIfNeeded(tableContainer, tr);
+            }
+            previousCategory = category;
+            previousIsJa = PP2_LANGUAGE.isSongToneLanguageJa();
+        };
+
+        // メトロノーム＆パートロード
+        PP2_FRONT.loadPartsToElement($('#header-left'), 'metronome_and_part_switches');
+        // プレイヤーロード
+        PP2_FRONT.loadPartsToElement($('#player-container'), 'player');
+
+        if (!PP2_CONTENTS.isKeyboardSettingAvailable()) {
+            $('.icbtn-keyboard').remove();
+        }
+    });
+</script>
+
+<script type="text/html" id="header">
+<div id="header-left" class="float-left"></div>
+<div class="float-right">
+    <button class="icbtn icbtn-remotecontroller" onclick="PP2_FRONT.showRightModal('settings_handler', 1000);"></button>
+</div>
+</script>
+
+<script type="text/html" id="body">
+    <div class="abs t0 r0 l0" style="height: 80px;" id="player-container"></div>
+    <div class="abs r0 l0 titlebar" style="top: 80px;"><lang key="songs_title"></lang></div>
+    <div class="abs r0 b0 l0"style="top: 120px;background-color: white;">
+        <div class="abs t0 l0 b0 border-right scrollable" style="width: 250px;">
+            <table id="categories-table" class="table data-table" width="100%">
+                <thead>
+                <tr><th><lang key="songs_title"></lang></th></tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+        <div class="abs t0 r0 b0 scrollable" style="left: 250px;">
+            <table id="songs-table" class="table data-table" width="100%">
+                <thead>
+                <tr><th id="category-name"></th></tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </div>
+</script>

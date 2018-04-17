@@ -1,0 +1,613 @@
+<script type="text/javascript">
+    $(function() {
+        var blankImage = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+        var pageCount = Number.MIN_SAFE_INTEGER;
+        var topMeas = Number.MIN_SAFE_INTEGER;
+        var endMeas = Number.MIN_SAFE_INTEGER;
+        var currentMeasure = Number.MIN_SAFE_INTEGER;
+        var isDigiscoreLibraryMeasInitialized = false;
+        var isStayingPage = true;
+        var loading = $('#score-img-loading');
+        var measTimer;
+        var isPlaying;
+        var keyTranspose;
+        var songTranspose;
+        var currentSong = undefined;
+
+        var setIsPlaying = function(isPlaying) {
+            if (isPlaying) {
+                // 再生開始後は正しいmeasをピアノから受信したいため、フラグをfalseに
+                isDigiscoreLibraryMeasInitialized = false;
+                PP2_DIGISCORE.measTimerStart();
+            } else {
+                PP2_DIGISCORE.measTimerStop();
+            }
+        };
+
+        var setMeasure = function(measure) {
+            PP2_DIGISCORE.seekMeas(measure);
+            isDigiscoreLibraryMeasInitialized = true;
+            if (!isPlaying || PP2_SAVEDATA.data.digiScoreLite.offsetInterval == 0 || currentMeasure <= 1 || measure <= 1) {
+                // 再生停止中・OffsetInterval設定が0の場合・実機側のmeasが進んでいない場合は実機からのmeasに追従する
+                currentMeasure = measure;
+                updateScoreIfNeeded();
+            }
+        };
+
+        var setSong = function(song) {
+            if (currentSong === song) {
+                return;
+            }
+            currentSong = song;
+            var loadSMFCallback = function(params) {
+                if (song != currentSong) {
+                    // 連続で曲が変わるなどの割り込みがあった場合
+                    return;
+                }
+                if (!isStayingPage) {
+                    return;
+                }
+                pageCount = Number.MIN_SAFE_INTEGER;
+                topMeas = Number.MIN_SAFE_INTEGER;
+                endMeas = Number.MIN_SAFE_INTEGER;
+                scoreDisplay.reset();
+                if (undefined != song) {
+                    scoreCacheHandler.setSongFileName(song.filename);
+                    if (params.result == -1) {
+                        console.log('LoadSMF failed. Retry.');
+                        setTimeout(function () {
+                            if (song != currentSong) {
+                                // 連続で曲が変わるなどの割り込みがあった場合
+                                return;
+                            }
+                            PP2_DIGISCORE.loadSMF(song.filename, loadSMFCallback);
+                        }, 500);
+                    } else {
+                        if (song != currentSong) {
+                            // 連続で曲が変わるなどの割り込みがあった場合
+                            return;
+                        }
+                        PP2_DIGISCORE.requestPageCount(function (params) {
+                            pageCount = params.pageCount;
+                            updateScoreIfNeeded(0);
+                        });
+                        PP2_DIGISCORE.requestMeas(function (params) {
+                            topMeas = params.top;
+                            endMeas = params.end;
+                            updateScoreIfNeeded();
+                        });
+                        clearInterval(measTimer);
+                        measTimer = setInterval(function () {
+                            if (isDigiscoreLibraryMeasInitialized && PP2_SAVEDATA.data.digiScoreLite.offsetInterval > 0) {
+                                // ピアノからmeas受信済み＆OffsetInterval設定が1以上の場合はライブラリのMeas進行に従う
+                                PP2_DIGISCORE.requestCurrentMeas(function (params) {
+                                    console.log("Meas in digiscore lib: " + params.meas);
+                                    if (isPlaying) {
+                                        // 再生停止中は干渉するので、再生中のみMeasTimerに従う
+                                        currentMeasure = params.meas;
+                                        updateScoreIfNeeded();
+                                    }
+                                });
+                            }
+                        }, 200);
+                    }
+                }
+            };
+            scoreCacheHandler.setSongFileName(undefined);
+            scoreDisplay.clear();
+            PP2_DIGISCORE.closeSMF();
+            if (PP2_CONTENTS.isKeepScoreRights() && song.copyright) {
+                // 著作権的に表示できない場合
+                loading.hide();
+                scoreDisplay.showErrorMessage();
+            } else {
+                scoreDisplay.hideErrorMessage();
+                PP2_DIGISCORE.loadSMF(song.filename, loadSMFCallback);
+            }
+        };
+
+        var getPageByMeasure = function() {
+            if (Number.MIN_SAFE_INTEGER === topMeas) {
+                return undefined;
+            }
+            return Math.min(Math.max(0, Math.floor((currentMeasure - topMeas) / 8)), pageCount - 1);
+        };
+
+        var updateScoreIfNeeded = function(page) {
+            if (pageCount == Number.MIN_SAFE_INTEGER || currentMeasure == Number.MIN_SAFE_INTEGER || topMeas == Number.MIN_SAFE_INTEGER) {
+                console.log("Not ready to render bitmap.");
+                return;
+            }
+
+            if (autoPageTurner.isActive()) {
+                // 自動ページめくりモードの場合は、現在のページをMeasureから算出
+                page = getPageByMeasure();
+            }
+
+            // 描画処理
+            scoreDisplay.goTo(page);
+        };
+
+        // 楽譜キャッシュ制御クロージャ
+        var scoreCacheHandler = (function() {
+            var currentSongFileName = undefined;
+            var currentTranspose = undefined;
+            var isRequestingBitmap = false;
+            var cachesSongFileName = undefined;
+            var cachesTranspose = undefined;
+            var caches = [];
+            var __ = {
+                setSongFileName: function(songFileName) {
+                    if (currentSongFileName == songFileName) {
+                        // 同じ曲の場合は読み直す必要無し
+                        return;
+                    }
+                    currentSongFileName = songFileName;
+                    isRequestingBitmap = false;
+                    cachesSongFileName = undefined;
+                    cachesTranspose = undefined;
+                    delete caches;
+                    caches = [];
+                    loading.show();
+                },
+                setTranspose: function(transpose) {
+                    console.log('Transpose: ' + transpose);
+                    if (transpose !== currentTranspose) {
+                        isRequestingBitmap = false;
+                        cachesSongFileName = undefined;
+                        cachesTranspose = undefined;
+                        delete caches;
+                        caches = [];
+                    }
+                    currentTranspose = transpose;
+                },
+                getCache: function(page) {
+                    if (!isValidPage(page)) {
+                        return;
+                    }
+                    var songFileName = currentSongFileName;
+                    var transpose = currentTranspose;
+                    setTimeout(function() {
+                        if (isEffective(songFileName, transpose)) {
+                            generateCachesIfNeeded(songFileName, transpose, page);
+                        }
+                    }, 100);
+                    return caches[page];
+                }
+            };
+
+            var isValidPage = function(page) {
+                return 0 <= page && page < pageCount && Number.MIN_SAFE_INTEGER != page;
+            };
+            var isEffective = function(songFileName, transpose) {
+                return undefined !== songFileName && songFileName == currentSongFileName && transpose == currentTranspose;
+            };
+
+            var generateCachesIfNeeded = function(songFileName, transpose, page) {
+                if (songFileName != cachesSongFileName || transpose != cachesTranspose) {
+                    cachesSongFileName = songFileName;
+                    cachesTranspose = transpose;
+                    delete caches;
+                    caches = [];
+                    loading.show();
+                }
+                generateCachesRecursively(songFileName, transpose, [page, page + 1, page - 1]);
+            };
+
+            var generateCachesRecursively = function(songFileName, transpose, pages) {
+                if (pages.length <= 0) {
+                    return;
+                }
+
+                if (!isEffective(songFileName, transpose)) {
+                    // setTimeout中に情報が古くなる場合があるので、その場合は何もしない
+                    return;
+                }
+
+                var page = pages.shift();
+                var requestAction = function() {
+                    // 重複リクエストを行うとエラーになるため、リクエストが終わるのを待つ
+                    if (isRequestingBitmap) {
+                        setTimeout(requestAction, 50);
+                        return;
+                    }
+                    if (!isEffective(songFileName, transpose)) {
+                        return;
+                    }
+                    if (!caches[page] && isValidPage(page)) {
+                        var startAt = new Date();
+                        isRequestingBitmap = true;
+                        PP2_DIGISCORE.requestBitmap(page, transpose, function (params) {
+                            console.log('requestBitmap finished. page:' + page + ' songFileName:' + songFileName + ' transpose:' + transpose + ' ' + (new Date().getTime() - startAt.getTime()) + 'ms');
+                            isRequestingBitmap = false;
+                            if (!isEffective(songFileName, transpose)) {
+                                return;
+                            }
+                            generateImageCache(params);
+                            console.log('generateImageCache finished. page:' + page + ' songFileName:' + songFileName + ' transpose:' + transpose + ' ' + (new Date().getTime() - startAt.getTime()) + 'ms');
+                            generateCachesRecursively(songFileName, transpose, pages);
+                        });
+                    } else {
+                        generateCachesRecursively(songFileName, transpose, pages);
+                    }
+                };
+                setTimeout(requestAction, 0);
+            };
+
+            var generateImageCache = function (params) {
+                var canvasBase = $('<canvas />');
+                canvasBase.attr({width: params.width, height: params.height});
+                var canvas = canvasBase[0];
+                var context = canvas.getContext('2d');
+                context.fillStyle = 'white';
+                context.fillRect(0, 0, params.width, params.height);
+
+                var imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+                var pixels = imageData.data;
+
+                var length = params.bitmap.length;
+                for (var i = 0; i < length; i = (i + 1)|0) {
+                    var byte = params.bitmap[i];
+                    for (var j = 0; j < 8; j = (j + 1)|0) {
+                        var base = (i * 8 + j) * 4;
+                        if (byte & 1 << (7 - j)) {
+                            continue;
+                        }
+                        // 黒塗りだけ行う
+                        pixels[base + 0] = 0;
+                        pixels[base + 1] = 0;
+                        pixels[base + 2] = 0;
+                    }
+                }
+
+                context.putImageData(imageData, 0, 0);
+
+                context.font = "18px 'CustomFont'";
+                context.fillStyle = 'black';
+                var offsetLeft = 115;
+                var marginLeft = 222;
+                var offsetTop = 225;
+                var marginTop = 240;
+                var seq = 0;
+                for (var y = 0; y < 2; y++) {
+                    for (var x = 0; x < 4; x++) {
+                        var measure = topMeas + params.page * 8 + seq;
+                        if (measure > endMeas) {
+                            break;
+                        }
+                        if (measure == 0) {
+                            measure = "PU";
+                        }
+                        context.fillText(measure, offsetLeft + marginLeft * x, offsetTop + marginTop * y);
+                        seq++;
+                    }
+                }
+                caches[params.page] = canvas.toDataURL();
+                canvasBase.remove();
+            };
+
+            return __;
+        })();
+
+        // ページめくり制御クロージャ
+        var autoPageTurner = (function() {
+            var button = $('#score-auto-page-turn-btn');
+            var isActive = true;
+
+            var __ = {
+                setActive: function(value) {
+                    isActive = value;
+                    if (isActive) {
+                        button.addClass('on');
+                        scoreDisplay.goTo(getPageByMeasure());
+                    } else {
+                        button.removeClass('on');
+                    }
+                },
+                isActive: function() {
+                    return isActive;
+                }
+            };
+
+            $(function() {
+                button.on('click', function() {
+                    __.setActive(!isActive);
+                });
+            });
+
+            return __;
+        })();
+
+        // スコア表示制御クロージャ
+        var scoreDisplay = (function() {
+            var currentPage = Number.MIN_SAFE_INTEGER;
+            var primary = $('#score-img-primary');
+            var secondary = $('#score-img-secondary');
+            var surface = $('#score-surface');
+            var errorMessage = $('#score-message-error');
+            var scale = 1;
+
+            var __ = {
+                setScale: function(value) {
+                    scale = value;
+                },
+                next: function() {
+                    autoPageTurner.setActive(false);
+                    animate(currentPage + 1);
+                },
+                prev: function() {
+                    autoPageTurner.setActive(false);
+                    animate(currentPage - 1);
+                },
+                goTo: function(page) {
+                    if (undefined === page) {
+                        page = currentPage;
+                    }
+                    animate(page);
+                },
+                jump: function(pageDiff) {
+                    autoPageTurner.setActive(false);
+                    animate(currentPage + pageDiff);
+                },
+                updateHighlight: function(page) {
+                    if (undefined === page) {
+                        page = currentPage;
+                    }
+
+                    var width = surface.width();
+                    var height = surface.height();
+                    var context = surface[0].getContext('2d');
+                    context.clearRect(0, 0, width, height);
+
+                    var measureInPage = (currentMeasure - topMeas) % 8;
+                    if (page != getPageByMeasure() || endMeas < currentMeasure || measureInPage < 0) {
+                        return;
+                    }
+
+                    var offsetLeft = 108;
+                    var marginLeft = 222;
+                    var offsetTop = 207;
+                    var marginTop = 240;
+
+                    var x = measureInPage % 4;
+                    var y = Math.floor(measureInPage / 4);
+                    context.fillStyle = 'rgba(243, 115, 33, 0.3)';
+                    fillRoundRect(context, offsetLeft + marginLeft * x, offsetTop + marginTop * y, 200, 25, 5);
+                },
+                reset: function() {
+                    currentPage = Number.MIN_SAFE_INTEGER;
+                },
+                clear: function() {
+                    primary.hide();
+                    secondary.hide();
+                    primary.attr('src', blankImage);
+                    secondary.attr('src', blankImage);
+                },
+                showErrorMessage: function() {
+                    errorMessage.show();
+                },
+                hideErrorMessage: function() {
+                    errorMessage.hide();
+                }
+            };
+
+            var fillRoundRect = function(context, l, t, w, h, r)
+            {
+                var pi = Math.PI;
+                context.beginPath();
+                context.arc(l + r, t + r, r, - pi, - 0.5 * pi, false);
+                context.arc(l + w - r, t + r, r, - 0.5 * pi, 0, false);
+                context.arc(l + w - r, t + h - r, r, 0, 0.5 * pi, false);
+                context.arc(l + r, t + h - r, r, 0.5 * pi, pi, false);
+                context.closePath();
+                context.fill();
+            };
+
+            var animate = function(page) {
+                if (Number.MIN_SAFE_INTEGER == pageCount || Number.MIN_SAFE_INTEGER == page || page < 0 || pageCount <= page) {
+                    return;
+                }
+                primary.show();
+
+                __.updateHighlight(-1);
+
+                var score = scoreCacheHandler.getCache(page);
+                if (undefined === score) {
+                    setTimeout(function() {
+                        animate(page);
+                    }, 100);
+                    return;
+                }
+                loading.hide();
+
+                if (page == currentPage || currentPage == Number.MIN_SAFE_INTEGER) {
+                    if (primary.attr('src') !== score) {
+                        primary.attr('src', score);
+                    }
+                    __.updateHighlight(page);
+                    currentPage = page;
+                    return;
+                }
+
+                var toLeft = currentPage < page;
+                currentPage = page;
+
+                __.updateHighlight(-1);
+                primary.css({left: 0});
+                primary.animate({left: screen.width / scale * (!toLeft ? 1 : -1) / 4, opacity: 0}, 100, 'linear', function() {
+                    primary.css({left: 0, opacity: 1});
+                    primary.attr('src', score);
+                    __.updateHighlight(page);
+                });
+                secondary.css({display: 'block', left:screen.width / scale * (toLeft ? 1 : -1) / 4, opacity: 0});
+                secondary.attr('src', score);
+                secondary.animate({left: 0, opacity: 1}, 100, 'linear', function() {
+                    secondary.css({display: 'none'});
+                });
+            };
+
+            $(function() {
+                var startTouch = undefined;
+                surface.on('touchstart', function(ev) {
+                    var touch = ev.originalEvent.changedTouches[0];
+                    startTouch = {
+                        id: touch.identifier,
+                        x: touch.pageX,
+                        y: touch.pageY,
+                        time: new Date()
+                    };
+                });
+                var swipeCheck = function(ev) {
+                    if (!startTouch) {
+                        return;
+                    }
+                    _.forEach(ev.originalEvent.changedTouches, function(v) {
+                        if (v.identifier != startTouch.id) {
+                            return;
+                        }
+                        var xDiff = v.pageX - startTouch.x;
+                        var yDiff = v.pageY - startTouch.y;
+                        if (50 < Math.abs(xDiff) && Math.abs(xDiff) > Math.abs(yDiff) && (new Date() - startTouch.time) < 300) {
+                            if (xDiff < 0) {
+                                __.next();
+                            } else {
+                                __.prev();
+                            }
+                        }
+                    });
+                    startTouch = undefined;
+                };
+                surface.on('touchend', swipeCheck);
+                surface.on('touchcancel', swipeCheck);
+            });
+
+            return __;
+        })();
+
+        PP2_FRONT.onUnload = function() {
+            isStayingPage = false;
+            scoreCacheHandler.setSongFileName(undefined);
+            pageCount = Number.MIN_SAFE_INTEGER;
+            clearInterval(measTimer);
+            PP2_DIGISCORE.closeSMF();
+            PP2_CORE.removeNotSleepTag('piano_player');
+        };
+
+        PP2_CORE.init(PP2_CORE.applicationModes.DigiScoreLite);
+
+        PP2_RECORDER.startAutoRecording();
+
+        PP2_MIDI.addCallback(p2addr.eventsMidiDisconnected, function() {
+            PP2_CONTENTS.clear();
+            $('.modal').modal('hide');
+            PP2_FRONT.showModal('error_disconnected', 350);
+        });
+
+        // KeyTransposeのコールバック
+        PP2_MIDI.addCallback(p2addr.keyTransposeRO, function(params) {
+            keyTranspose = params.value - 64;
+            if (undefined !== keyTranspose && undefined !== songTranspose) {
+                scoreCacheHandler.setTranspose(songTranspose - keyTranspose);
+                updateScoreIfNeeded();
+            }
+        });
+
+        // SongTransposeのコールバック
+        PP2_MIDI.addCallback(p2addr.songTransposeRO, function(params) {
+            songTranspose = params.value - 64;
+            if (undefined !== keyTranspose && undefined !== songTranspose) {
+                scoreCacheHandler.setTranspose(songTranspose - keyTranspose);
+                updateScoreIfNeeded();
+            }
+        });
+
+        // 曲情報のコールバック
+        PP2_MIDI.addCallback(p2addr.songNumber, function(params) {
+            // 範囲外のcategoryNoが来た場合は補正
+            params.categoryNo = params.categoryNo > PP2_CONTENTS.getSongList().category.length ? 0 : params.categoryNo;
+            if (params.categoryNo == 0) {
+                // 表示対象外の曲
+                scoreCacheHandler.setSongFileName(undefined);
+                scoreDisplay.clear();
+                scoreDisplay.showErrorMessage();
+                loading.hide();
+                return;
+            }
+            setSong(PP2_CONTENTS.getSongList().category[params.categoryNo - 1].song[params.number]);
+        });
+
+        // デジスコア内measTimerへの値セット
+        PP2_MIDI.addCallback(p2addr.sequencerStatus, function(params) {
+            isPlaying = params.value == 1;
+            setIsPlaying(isPlaying);
+        });
+        PP2_MIDI.addCallback(p2addr.sequencerTempoNotation, function(params) {
+            PP2_DIGISCORE.setNotation(params.value);
+        });
+        PP2_MIDI.addCallback(p2addr.sequencerTempoRO, function(params) {
+            PP2_DIGISCORE.measTimerSetTempo(params.value);
+        });
+        PP2_MIDI.addCallback(p2addr.sequencerMeasure, function(params) {
+            console.log("Meas in piano: " + params.value);
+            setMeasure(params.value);
+        });
+
+        // ページめくりのコールバック
+        PP2_MIDI.addCallback(p2addr.pageTurnPreviousPage, function(params) {
+            scoreDisplay.jump(-params.value);
+        });
+        PP2_MIDI.addCallback(p2addr.pageTurnNextPage, function(params) {
+            scoreDisplay.jump(params.value);
+        });
+
+        // ページめくり設定を実機へ送信
+        PP2_MIDI.sendSorePageTurn(PP2_SAVEDATA.data.digiScoreLite.pageTurn);
+
+        // メトロノーム＆パートロード
+        PP2_FRONT.loadPartsToElement($('#header-left'), 'metronome_and_part_switches');
+        // プレイヤーロード
+        PP2_FRONT.loadPartsToElement($('#player-container'), 'player');
+
+        // OffsetIntervalの値セット
+        PP2_DIGISCORE.setOffsetInterval(PP2_SAVEDATA.data.digiScoreLite.offsetInterval);
+        
+        var scoreContainer = $('#score-container');
+        // 縦スワイプでピクピクする問題を防ぐため、スクロール無効に
+        scoreContainer.bind('touchmove', function(e) {
+            e.preventDefault();
+        });
+        var scale = scoreContainer.parent().height() / (scoreContainer.height());
+        scoreContainer.css('transform', 'scale(' + scale + ', ' + scale + ')');
+        scoreDisplay.setScale(scale);
+
+        if (!PP2_CONTENTS.isKeyboardSettingAvailable()) {
+            $('.icbtn-keyboard').remove();
+        }
+
+        // トランスポーズ取得
+        PP2_MIDI.request(p2addr.keyTransposeRO);
+        PP2_MIDI.request(p2addr.songTransposeRO);
+    });
+</script>
+
+<script type="text/html" id="header">
+    <div id="header-left" class="float-left"></div>
+    <div class="float-right">
+        <button id="score-auto-page-turn-btn" class="icbtn icbtn-auto-page-turn on"></button>
+        <button class="icbtn icbtn-cog" onclick="PP2_FRONT.showRightModal('digiscorelite_settings', 400)"></button>
+        <button class="icbtn icbtn-remotecontroller" onclick="PP2_FRONT.showRightModal('settings_handler', 1000);"></button>
+    </div>
+</script>
+
+<script type="text/html" id="body">
+    <div class="abs t0 r0 l0" style="height: 80px;" id="player-container"></div>
+    <div class="abs r0 b0 l0"style="top: 80px;border-top: solid 1px #A4A4AC;background: white;text-align: center;">
+        <div id="score-container" style="width: 992px; height: 550px; position: relative;left: 0;right: 0;margin: 0 auto;transform-origin: center top;-webkit-transform-origin: center top;">
+            <img id="score-img-loading" src="./images/img_loading.gif" style="position: absolute;top: 0;right: 0;bottom: 0;left: 0;z-index: 0;margin: auto;width: 40px;height: 40px;" />
+            <img id="score-img-secondary" style="position: absolute;top: 0;right: 0;bottom: 0;left: 0;z-index: 1;" />
+            <img id="score-img-primary" style="position: absolute;top: 0;right: 0;bottom: 0;left: 0;z-index: 2;" />
+            <canvas id="score-surface" width="992" height="550" style="position: absolute;top: 0;right: 0;bottom: 0;left: 0;z-index: 3;" />
+            <span id="score-message-error" style="position: absolute;top: 0;right: 0;bottom: 0;left: 0;z-index: 0;margin: auto;width: 1024px;height: 40px;font-size: 30px;line-height: 40px;color: #F37321;display: none;"><lang key="digiscore_cannot_diplay_song"></lang></span>
+        </div>
+    </div>
+</script>

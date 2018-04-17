@@ -1,0 +1,75 @@
+<!-- エディタ参照のみの用途 -->
+<head>
+    <link rel="stylesheet" type="text/css" href="../../bootstrap-3.3.6-dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" type="text/css" href="../../bootstrap-3.3.6-dist/css/bootstrap-theme.min.css" />
+    <link rel="stylesheet" type="text/css" href="../../animsition/css/animsition.min.css" />
+    <link rel="stylesheet" type="text/css" href="../../css/pp2.css" />
+</head>
+<!-- / -->
+
+<script type="text/javascript">
+    $(function() {
+        if ('function' !== typeof(PP2_FRONT.scriptPool.getFlashCardMode)) {
+            // FlashCard表示後すばやく画面を遷移した場合に発生する。ひとまずエラー回避
+            setTimeout(function () {
+                $('.modal').modal('hide');
+            }, 300);
+            return;
+        }
+
+        if (!PP2_MIDI.isConnected()) {
+            $(".require-connect").attr('disabled', true);
+        }
+
+        var modeButtons = $('#flashcard-mode-btn-container').find('button');
+        modeButtons.on('click', function () {
+            var index = modeButtons.index(this);
+            PP2_FRONT.scriptPool.setFlashCardMode(index);
+            modeButtons.removeClass('btn-primary').addClass('btn-default');
+            $(this).removeClass('btn-default').addClass('btn-primary');
+        });
+        modeButtons.eq(PP2_FRONT.scriptPool.getFlashCardMode()).click();
+
+        var difficultyButtons = $('#flashcard-difficulty-btn-container').find('button');
+        difficultyButtons.on('click', function () {
+            var index = difficultyButtons.index(this);
+            PP2_FRONT.scriptPool.setFlashCardDifficulty(index);
+            difficultyButtons.removeClass('btn-primary').addClass('btn-default');
+            $(this).removeClass('btn-default').addClass('btn-primary');
+        });
+        difficultyButtons.eq(PP2_FRONT.scriptPool.getFlashCardDifficulty()).click();
+    });
+</script>
+
+<style type="text/css">
+    #flashcard-mode-btn-container button {
+        width: 179px;
+    }
+    #flashcard-difficulty-btn-container {
+        margin-top: 20px;
+    }
+    #flashcard-difficulty-btn-container button {
+        width: 119.3px;
+    }
+</style>
+
+<script type="text/html" id="header">
+    <lang key="flashcard_select_mode"></lang>
+</script>
+
+<script type="text/html" id="body">
+    <div id="flashcard-mode-btn-container" class="multi">
+        <button type="button" class="btn btn-primary"><lang key="flashcard_mode_listen"/></button>
+        <button type="button" class="btn btn-default require-connect"><lang key="flashcard_mode_read"/></button>
+    </div>
+
+    <div id="flashcard-difficulty-btn-container" class="multi">
+        <button type="button" class="btn btn-primary"><lang key="flashcard_beginner"/></button>
+        <button type="button" class="btn btn-default require-connect"><lang key="flashcard_average"/></button>
+        <button type="button" class="btn btn-default require-connect"><lang key="flashcard_expert"/></button>
+    </div>
+</script>
+
+<script type="text/html" id="footer">
+    <button type="button" class="btn btn-default positive" data-dismiss="modal" onclick="PP2_FRONT.scriptPool.start();"><lang key="flashcard_start"/></button>
+</script>

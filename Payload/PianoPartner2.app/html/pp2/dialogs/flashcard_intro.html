@@ -1,0 +1,27 @@
+<script type="text/javascript">
+    $(function() {
+        $('#flash-card-base-tone-image').attr('src', PP2_FRONT.scriptPool.getScoreSrc('3C'));
+    });
+</script>
+
+<style type="text/css">
+    #flash-card-base-tone-image {
+        display: inline-block;
+        margin: 0 45px;
+    }
+</style>
+
+<script type="text/html" id="header">
+    <lang key="flashcard_listen_to_reference"/>
+</script>
+
+<script type="text/html" id="body">
+    <img id="flash-card-base-tone-image" />
+</script>
+
+<script type="text/html" id="footer">
+    <div>
+        <button type="button" class="btn btn-default" onclick="PP2_FRONT.scriptPool.sendBaseTone();"><lang key="flashcard_listen_again"/></button>
+        <button type="button" class="btn btn-default positive" data-dismiss="modal" onclick="PP2_FRONT.scriptPool.nextQuestion();"><lang key="flashcard_next"/></button>
+    </div>
+</script>

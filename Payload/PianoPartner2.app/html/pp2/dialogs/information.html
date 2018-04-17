@@ -1,0 +1,112 @@
+<script type="text/javascript">
+    PP2_CORE.requestAppVersion(function(params) {
+        $('#version').html(params.version);
+    });
+
+    var midiEndpoint = $('#midi-endpoint');
+    if (PP2_MIDI.isConnected()) {
+        midiEndpoint.html(PP2_MIDI.getMIDIDeviceName());
+    } else {
+        midiEndpoint.html(PP2_LANGUAGE.getValues().not_connected);
+    }
+
+    var easterEggCounter = 0;
+    $('#easter-egg-trigger').on('click', function() {
+        easterEggCounter++;
+        if (easterEggCounter > 5) {
+            easterEggCounter = 0;
+            $('.modal').modal('hide');
+            PP2_FRONT.showModal('easter_egg', 440);
+        }
+    });
+
+    if (PP2_CONTENTS.licenses.hasJASRAC()) {
+        $('#information-license-jasrac').show();
+    }
+    if (PP2_CONTENTS.licenses.hasELicense()) {
+        $('#information-license-e-license').show();
+    }
+    $('#information-license-value').html(PP2_CONTENTS.licenses.getValue());
+</script>
+
+<style type="text/css">
+    .right-modal .modal-body {
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+    .license-logo-container {
+        margin-top: -25px;
+        min-height: 5px;
+    }
+    .license-logo-container img {
+        margin-top: 0;
+        margin-right: 10px;
+        height: 50px;
+    }
+    #information-license-value {
+        margin: 8px 0 -2px 0;
+        font-size: 12px;
+        line-height: 12px;
+    }
+    .information-software-license-btn-container {
+        margin: 8px 0;
+    }
+    .information-license-developer {
+        text-align: center;
+        padding: 0 0;
+    }
+    .information-license-developer img {
+        width: 120px;
+        margin: 0 20px;
+    }
+</style>
+
+<script type="text/html" id="header">
+    <lang key="information"></lang>
+</script>
+
+<script type="text/html" id="body">
+    <table class="table data-table options-table">
+        <tbody>
+        <tr>
+            <th><lang key="connected_to"></lang></th>
+            <td><span id="midi-endpoint"><lang key="not_connected"></lang></span></td>
+        </tr>
+        <tr id="easter-egg-trigger">
+            <th><lang key="version"></lang></th>
+            <td><span id="version">X.X.X</span></td>
+        </tr>
+        <tr>
+            <th><lang key="visit_us"></lang></th>
+            <td><a href="#" onclick="PP2_CORE.openInBrowser('http://roland.cm/pianopartner2');"><lang key="here" style="text-decoration: underline;"></a></td>
+        </tr>
+        <tr>
+            <th colspan="2" class="noborder"><lang key="special_thanks_to"></lang></th>
+        </tr>
+        <tr>
+            <td colspan="2" style="text-align: center;padding: 0;">
+                <div class="information-license-developer">
+                    <img src="./images/img_logo_tomomusic.png" />
+                    <img src="./images/img_logo_qnote.png" />
+                </div>
+            </td>
+        </tr>
+        <tr>
+            <th colspan="2" class="noborder"><lang key="license"></lang></th>
+        </tr>
+        <tr>
+            <td colspan="2" style="text-align: center;border-bottom: none;position: relative;">
+                <div class="license-logo-container">
+                    <img id="information-license-jasrac" src="./images/img_logo_jasrac.png" style="display: none;" />
+                    <img id="information-license-e-license" src="./images/img_logo_e_license.png" style="display: none;" />
+                </div>
+                <div id="information-license-value" style="white-space: pre-wrap;"></div>
+                <div class="information-software-license-btn-container"><button class="btn btn-default" data-dismiss="modal" onclick="PP2_FRONT.showRightModal('software_license');"><lang key="software_license"></lang></button></div>
+            </td>
+        </tr>
+        </tbody>
+    </table>
+</script>
+
+<script type="text/html" id="footer">
+</script>

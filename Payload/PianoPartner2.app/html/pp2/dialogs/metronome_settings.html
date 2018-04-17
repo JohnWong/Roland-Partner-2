@@ -1,0 +1,253 @@
+<!-- エディタ参照のみの用途 -->
+<head>
+    <link rel="stylesheet" type="text/css" href="../../bootstrap-3.3.6-dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" type="text/css" href="../../bootstrap-3.3.6-dist/css/bootstrap-theme.min.css" />
+    <link rel="stylesheet" type="text/css" href="../../animsition/css/animsition.min.css" />
+    <link rel="stylesheet" type="text/css" href="../../css/pp2.css" />
+</head>
+<!-- / -->
+
+<script type="text/javascript">
+    $(function() {
+        if (PP2_CONTENTS.isKeyboardSettingAvailable()) {
+            $('lang[key=tone_settings]').remove();
+        } else {
+            $('lang[key=keyboard_and_tones_settings]').remove();
+        }
+
+        var callbackKeys = [];
+        PP2_FRONT.modalCloseCallback = function() {
+            PP2_MIDI.removeCallbacks(callbackKeys);
+            if ('object' === typeof(PP2_FRONT.scriptPool.sequencerTempoSettingsIF)) {
+                PP2_MIDI.removeCallbacks(PP2_FRONT.scriptPool.sequencerTempoSettingsIF.callbackKeys);
+            }
+        };
+
+        // タブボタン設定
+        var tabButtons = $('.btn-tab').not('.current');
+        tabButtons.eq(0).on('click', function(e) {PP2_FRONT.global.settingsHandlerIF.goTo('keyboard_and_tone_settings');e.stopPropagation();});
+        tabButtons.eq(1).on('click', function(e) {PP2_FRONT.global.settingsHandlerIF.goTo('overall_settings');e.stopPropagation();});
+        $('.btn-tab.current').on('click', function(e) {e.stopPropagation();});
+
+        // メトロノームON/OFF
+        var metronomeOnOffButton = $('#metronome-settings-onoff-btn');
+        callbackKeys.push(PP2_FRONT.initToggleIcon([metronomeOnOffButton, metronomeOnOffButton.find('div')], [p2addr.metronomeStatus, p2addr.metronomeSwToggle], function(v) {
+            if (v === 1) {
+                metronomeOnOffButton.removeClass('btn-default').addClass('btn-primary');
+            } else {
+                metronomeOnOffButton.removeClass('btn-primary').addClass('btn-default');
+            }
+        }));
+
+        // テンポ
+        PP2_FRONT.loadPartsToElement($('#sequencer-tempo-container'), 'sequencer_tempo_settings');
+
+        // パターン
+        if (PP2_CONTENTS.isMetronomePatternAvailable()) {
+            callbackKeys.push(PP2_FRONT.initMultiButton($('#metronome-pattern-buttons'), p2addr.metronomePattern, [0, 1, 2, 3, 4, 5, 6, 7]));
+        } else {
+            $('#metronome-pattern-buttons').remove();
+        }
+
+        // 拍子
+        var beatSelectElement = $('#metronome-beat-select');
+        if (PP2_CONTENTS.isMetronomeBeatAvailable()) {
+            var values = [];
+            switch (PP2_CONTENTS.getMetronomeBeatTypeValue()) {
+                case 0:
+                    values = ['2/2', '3/2', '2/4', '3/4', '4/4', '5/4', '6/4', '7/4', '3/8', '6/8', '8/8', '9/8', '12/8'];
+                    break;
+                case 1:
+                    values = ['0/4', '2/2', '3/2', '2/4', '3/4', '4/4', '5/4', '6/4', '7/4', '3/8', '6/8', '8/8', '9/8', '12/8'];
+                    break;
+                case 2:
+                    values = ['2/2', '0/4', '2/4', '3/4', '4/4', '5/4', '6/4', '7/4', '3/8', '6/8', '9/8', '12/8'];
+                    break;
+                case 3:
+                    values = ['0/4', '2/4', '3/4', '4/4', '5/4', '6/4'];
+                    break;
+            }
+            callbackKeys.push(PP2_FRONT.initSelect(beatSelectElement, p2addr.metronomeBeat, values));
+        } else {
+            beatSelectElement.parent().remove();
+        }
+
+        // 強拍
+        if (PP2_CONTENTS.isMetronomeDownBeatAvailable()) {
+            callbackKeys.push(PP2_FRONT.initMultiButton($('#metronome-down-beat-buttons'), p2addr.metronomeDownBeat, [0,1]));
+        } else {
+            $('#metronome-down-beat-buttons').parent().remove();
+        }
+
+        // 音量
+        if (PP2_CONTENTS.isMetronomeVolumeAvailable()) {
+            var min = 0;
+            var sliderValueToDisplayValueConverter = 0;
+            switch (PP2_CONTENTS.getMetronomeVolumeTypeValue()) {
+                case 0:
+                    sliderValueToDisplayValueConverter = function(v) {
+                        return v === 0 ? PP2_LANGUAGE.getValues().off : v;
+                    };
+                    break;
+                case 1:
+                    min = 1;
+                    break;
+            }
+            callbackKeys.push(PP2_FRONT.initSlider($('#metronome-volume-slider'), $('#metronome-volume-value'), p2addr.metronomeVolume, {min: min, max: 10}, 0, 0, sliderValueToDisplayValueConverter).callbackKey);
+        } else {
+            $('#metronome-volume-slider').parent().remove();
+        }
+
+        // 音色
+        if (PP2_CONTENTS.isMetronomeToneAvailable()) {
+            callbackKeys.push(PP2_FRONT.initSelect($('#metronome-tone-select'), p2addr.metronomeTone, [
+                PP2_LANGUAGE.getValues().metronome_tone_click,
+                PP2_LANGUAGE.getValues().metronome_tone_electronic,
+                PP2_LANGUAGE.getValues().metronome_tone_voice_jp,
+                PP2_LANGUAGE.getValues().metronome_tone_voice_en
+            ]));
+        } else {
+            $('#metronome-tone-select').parent().remove();
+        }
+
+        // rq1
+        PP2_MIDI.request('01000100', 256);
+        PP2_MIDI.request('01000200', 256);
+    });
+    //# sourceURL=dialogs/metronome_settings.js
+</script>
+
+<style type="text/css">
+    .slider.slider-horizontal {
+        width: 350px;
+        margin: 10px 73px 0px 73px;
+    }
+    #metronome-settings-onoff-btn {
+        padding: 0;
+    }
+    #metronome-pattern-buttons {
+        padding: 0;
+    }
+    #metronome-pattern-buttons .multi {
+        padding-top: 0;
+        padding-bottom: 0;
+    }
+    #sequencer-tempo-buttons {
+        padding-bottom: 0;
+    }
+    #metronome-pattern-buttons div .btn {
+        width: 118px;
+        height: 45px;
+        padding: 0;
+    }
+    #metronome-pattern-buttons div .btn div {
+        height: 100%;
+    }
+    #metronome-pattern-buttons div:nth-child(2) .btn-default:nth-child(1) div {
+         background: transparent url("images/metropattern_0.png") no-repeat center center;
+     }
+    #metronome-pattern-buttons div:nth-child(2)  .btn-default:nth-child(2) div {
+        background: url("images/metropattern_1.png") no-repeat center center;
+    }
+    #metronome-pattern-buttons div:nth-child(2)  .btn-default:nth-child(3) div {
+        background: url("images/metropattern_2.png") no-repeat center center;
+    }
+    #metronome-pattern-buttons div:nth-child(2)  .btn-default:nth-child(4) div {
+        background: url("images/metropattern_3.png") no-repeat center center;
+    }
+    #metronome-pattern-buttons div:last-child .btn-default:nth-child(1) div {
+        background: url("images/metropattern_4.png") no-repeat center center;
+    }
+    #metronome-pattern-buttons div:last-child .btn-default:nth-child(2) div {
+        background: url("images/metropattern_5.png") no-repeat center center;
+    }
+    #metronome-pattern-buttons div:last-child .btn-default:nth-child(3) div {
+        background: url("images/metropattern_6.png") no-repeat center center;
+    }
+    #metronome-pattern-buttons div:last-child .btn-default:nth-child(4) div {
+        background: url("images/metropattern_7.png") no-repeat center center;
+    }
+    #metronome-pattern-buttons div:nth-child(2)  .btn-primary:nth-child(1) div {
+        background: url("images/metropattern_0_on.png") no-repeat center center;
+    }
+    #metronome-pattern-buttons div:nth-child(2)  .btn-primary:nth-child(2) div {
+        background: url("images/metropattern_1_on.png") no-repeat center center;
+    }
+    #metronome-pattern-buttons div:nth-child(2)  .btn-primary:nth-child(3) div {
+        background: url("images/metropattern_2_on.png") no-repeat center center;
+    }
+    #metronome-pattern-buttons div:nth-child(2)  .btn-primary:nth-child(4) div {
+        background: url("images/metropattern_3_on.png") no-repeat center center;
+    }
+    #metronome-pattern-buttons div:last-child .btn-primary:nth-child(1) div {
+        background: url("images/metropattern_4_on.png") no-repeat center center;
+    }
+    #metronome-pattern-buttons div:last-child .btn-primary:nth-child(2) div {
+        background: url("images/metropattern_5_on.png") no-repeat center center;
+    }
+    #metronome-pattern-buttons div:last-child .btn-primary:nth-child(3) div {
+        background: url("images/metropattern_6_on.png") no-repeat center center;
+    }
+    #metronome-pattern-buttons div:last-child .btn-primary:nth-child(4) div {
+        background: url("images/metropattern_7_on.png") no-repeat center center;
+    }
+</style>
+
+<script type="text/html" id="header">
+    <div class="btn-tab-container">
+        <button class="btn-tab current"><lang key="metronome_settings"></lang></button>
+        <button class="btn-tab"><lang key="tone_settings"></lang><lang key="keyboard_and_tones_settings"></lang></button>
+        <button class="btn-tab"><lang key="overall_settings"></lang></button>
+    </div>
+</script>
+
+<script type="text/html" id="body">
+    <div class="abs t0 b0 l0 settings scrollable" style="right: 500px;">
+        <div style="height: 50px;">
+            <div class="title">
+                <lang key="metronome"></lang>
+                <button id="metronome-settings-onoff-btn" class="btn btn-default right"><div class="icbtn icbtn-metronome-transparent"></div></button>
+            </div>
+        </div>
+        <div id="sequencer-tempo-container"></div>
+        <div id="metronome-pattern-buttons">
+            <div class="title"><lang key="metronome_pattern"></lang></div>
+            <div class="multi multi-upper">
+                <button class="btn btn-default"><div></div></button>
+                <button class="btn btn-default"><div></div></button>
+                <button class="btn btn-default"><div></div></button>
+                <button class="btn btn-default"><div></div></button>
+            </div>
+            <div class="multi multi-bottom">
+                <button class="btn btn-default"><div></div></button>
+                <button class="btn btn-default"><div></div></button>
+                <button class="btn btn-default"><div></div></button>
+                <button class="btn btn-default"><div></div></button>
+            </div>
+        </div>
+    </div>
+    <div class="abs t0 r0 b0 settings scrollable" style="left: 500px; border-left: solid 1px #BFC0C1;">
+        <div class="title" style="height: 50px;">
+            <lang key="metronome_beat"></lang>
+            <select id="metronome-beat-select"></select>
+        </div>
+        <div class="title" style="height: 50px;">
+            <lang key="metronome_down_beat"></lang>
+            <div id="metronome-down-beat-buttons" class="multi">
+                <button class="btn btn-default"><lang key="off"></lang></button>
+                <button class="btn btn-default"><lang key="on"></lang></button>
+            </div>
+        </div>
+        <div>
+            <div class="title"><lang key="metronome_volume"></lang>&nbsp;<span id="metronome-volume-value"></span></div>
+            <input id="metronome-volume-slider" />
+        </div>
+        <div class="title" style="height: 50px;">
+            <lang key="metronome_tone"></lang>
+            <select id="metronome-tone-select" data-width="185"></select>
+        </div>
+    </div>
+</script>
+
+<script type="text/html" id="footer">
+</script>

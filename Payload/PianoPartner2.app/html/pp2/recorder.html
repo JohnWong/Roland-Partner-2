@@ -1,0 +1,369 @@
+<!-- エディタ参照のみの用途 -->
+<head>
+    <link rel="stylesheet" type="text/css" href="../bootstrap-3.3.6-dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" type="text/css" href="../bootstrap-3.3.6-dist/css/bootstrap-theme.min.css" />
+    <link rel="stylesheet" type="text/css" href="../animsition/css/animsition.min.css" />
+    <link rel="stylesheet" type="text/css" href="../css/pp2.css" />
+</head>
+<!-- / -->
+
+<script type="text/javascript">
+    $(function() {
+        var isActive = true;
+        PP2_CORE.init(PP2_CORE.applicationModes.Recorder);
+
+        PP2_RECORDER.stopAutoRecording();
+
+        PP2_MIDI.addCallback(p2addr.eventsMidiDisconnected, function() {
+            PP2_CONTENTS.clear();
+            $('.modal').modal('hide');
+            PP2_FRONT.showModal('error_disconnected', 350);
+        });
+
+        PP2_FRONT.onUnload = function() {
+            isActive = false;
+            PP2_RECORDER.removeEventListener(recorderEventListener);
+            PP2_PLAYER.removeAllEventListeners();
+            PP2_RECORDER.stopRecording();
+            PP2_DB.removeAllEventListeners();
+        };
+
+        // 編集ダイアログのロード
+        var overlayContainer = $('#diary-right-content-recorded-song-name-edit-overlay-container');
+        PP2_FRONT.loadPartsToElement(overlayContainer, 'recorded_song_name_edit_overlay');
+
+        var positionSlider = PP2_FRONT.initSliderWithoutMIDIConnection($('#recorder-player-position-slider'), $('#recorder-player-time'), {}, function(v) {
+            var seconds = Math.floor(v / 1000);
+            return _.sprintf('%02d:%02d', Math.floor(seconds / 60), seconds % 60);
+        }, function(v) {
+            PP2_PLAYER.setPosition(v);
+        });
+        positionSlider.sliderElement.slider('disable');
+        var recorderEventListener = {
+            onRecording: function(milliSeconds) {
+                var seconds = Math.floor(milliSeconds / 1000);
+                $('#recorder-recorder-time').text(_.sprintf('%02d:%02d', Math.floor(seconds / 60), seconds % 60));
+            }
+        };
+        PP2_RECORDER.addEventListener(recorderEventListener);
+
+        var container = $('#recorder-recorded-songs-container');
+
+        var recordButton = $('.recorder-recorder-container').find('button').eq(0);
+
+        var playerControllerButtons = $('#recorder-player-controller').find('button');
+        PP2_PLAYER.initController(playerControllerButtons.eq(1), playerControllerButtons.eq(0), playerControllerButtons.eq(2), playerControllerButtons.eq(3), positionSlider, ['myglyphicon-play', 'myglyphicon-pause']);
+        playerControllerButtons.eq(1).on('click', function () {
+            PP2_CORE.countUpUseCount(PP2_CORE.countTargets.RecorderPlayButton);
+        });
+
+        var changePlayerButtonsActivation = function(isActive) {
+            if (isActive) {
+                positionSlider.sliderElement.slider('enable');
+                playerControllerButtons.removeProp('disabled');
+            } else {
+                positionSlider.sliderElement.slider('disable');
+                playerControllerButtons.prop('disabled', true);
+            }
+        };
+
+        recordButton.on('click', function() {
+            PP2_PLAYER.stop();
+            if (PP2_RECORDER.isForceRecording()) {
+                PP2_RECORDER.stopRecording(function () {
+                    $('#recorder-recorder-time').text('00:00');
+                    refreshList(true);
+                });
+                recordButton.removeClass('myglyphicon-stop').addClass('myglyphicon-black-large-circle');
+
+                $('#recorder-recorded-songs-container').css('pointer-events', 'auto');
+                $('#recorder-recorded-songs-container').find('td').removeClass('disabled');
+                changePlayerButtonsActivation(PP2_PLAYER.isLoaded());
+            } else {
+                PP2_RECORDER.startRecording(true);
+                recordButton.removeClass('myglyphicon-black-large-circle').addClass('myglyphicon-stop');
+
+                $('#recorder-recorded-songs-container').css('pointer-events', 'none');
+                $('#recorder-recorded-songs-container').find('td').addClass('disabled');
+                changePlayerButtonsActivation(false);
+            }
+        });
+
+        var refreshList = function(needToSelectFirst) {
+            PP2_DB.requestUsers(function(res)
+            {
+                var users = res.items;
+                PP2_DB_AWS_HANDLER.requestRecordedSongsOnRecorder(function (items) {
+                    items = _.sortBy(items, 'startAt');
+                    items = items.reverse();
+                    container.empty();
+                    var tbody = $('<tbody />');
+                    $('<table />').addClass("table data-table recorded-songs-table")
+                        .append($('<thead />'))
+                        .append(tbody)
+                        .appendTo(container);
+                    _.forEach(items, function (item, index) {
+                        var time = _.sprintf('%02d:%02d', Math.floor(item.lengthOfTime / 60), item.lengthOfTime % 60);
+                        $('<tr />').append($('<td />').text((index + 1) + '.'))
+                            .append($('<td />').text(item.name).append(item.userId === PP2_DB.currentUser.objectId ?
+                                $('<button />').addClass('btn btn-default glyphicon glyphicon-pencil').css('display', 'none').on('click', function() {
+                                    // 曲名の編集
+                                    PP2_FRONT.scriptPool.recordedSongsNameEditOverlayIF.show(overlayContainer, item, function() {
+                                        refreshList();
+                                    });
+                                }) : ''
+                            ) )
+                            .append($('<td />').text(time))
+                            .append($('<td />').text(fecha.format(new Date(item.startAt), 'YYYY/MM/DD HH:mm:ss')))
+                            .append($('<td />').html($('<img />').addClass('user-icon-small').attr('src', _.filter(users, function(user) {return user.objectId === item.userId;})[0].icon)))
+                            .append($('<td />').append(item.userId === PP2_DB.currentUser.objectId ? $('<button class="btn btn-default glyphicon glyphicon-trash" style="display: none;"></button>').on('click', function () {
+                                PP2_FRONT.confirm([PP2_LANGUAGE.getValues().confirm_remove_manual_recorded_song, PP2_LANGUAGE.getValues().confirm_ok_delete, PP2_LANGUAGE.getValues().confirm_cancel], function() {
+                                    changePlayerButtonsActivation(false);
+                                    item.removed = true;
+                                    PP2_DB.createOrUpdateRecordedSong(item, function () {
+                                        refreshList();
+                                    });
+                                });
+                            }) : ''))
+                            .on('click', function () {
+                                // 楽曲選択時は楽曲データを読み込む
+                                tbody.find('.info').removeClass('info').find('button').hide();
+                                $(this).addClass('info').find('button').show();
+
+                                changePlayerButtonsActivation(false);
+                                var refreshPlayerInfo = function() {
+                                    var seconds = Math.floor(PP2_PLAYER.getDuration() / 1000);
+                                    $('#recorder-player-duration').text(_.sprintf('%02d:%02d', Math.floor(seconds / 60), seconds % 60));
+                                    positionSlider.sliderElement.slider('setAttribute', 'max', PP2_PLAYER.getDuration());
+                                    positionSlider.setValue(PP2_PLAYER.getPosition());
+                                    changePlayerButtonsActivation(true);
+                                };
+                                if (undefined === PP2_PLAYER.getCurrentRecordedSong() || PP2_PLAYER.getCurrentRecordedSong().objectId !== item.objectId) {
+                                    PP2_PLAYER.load(item, refreshPlayerInfo);
+                                } else {
+                                    refreshPlayerInfo();
+                                }
+                            })
+                            .appendTo(tbody);
+                    });
+                    if (items.length > 0) {
+                        if (needToSelectFirst) {
+                            tbody.find('tr').eq(0).trigger('click');
+                        } else if (undefined !== PP2_PLAYER.getCurrentRecordedSong()) {
+                            if (PP2_PLAYER.getCurrentRecordedSong().isAutoRecorded) {
+                                // 日記用の録音曲が読み込まれている場合は自動選択しない
+                                return;
+                            }
+
+                            var index = _.findIndex(items, {objectId: PP2_PLAYER.getCurrentRecordedSong().objectId});
+                            if (index >= 0) {
+                                tbody.find('tr').eq(index).trigger('click');
+                                return;
+                            }
+                        }
+                    }
+                });
+            });
+        };
+        refreshList();
+
+        PP2_DB.addEventListener({
+            'onUserChanged': function () {
+                PP2_FRONT.goTo(PP2_CORE.applicationModes.Recorder);
+            }
+        });
+        PP2_FRONT.refreshUserIcon();
+
+        // 注意ダイアログ表示
+        if (PP2_CORE.isAndroid() && PP2_MIDI.isBlueTooth() && !PP2_SAVEDATA.data.rhythm.notShowRhythmNotificationDialogForAndroid) {
+            PP2_FRONT.showModal('rhythm_notification_dialog_for_android', 500);
+        }
+    });
+    //# sourceURL=dialogs/recorder.js
+</script>
+
+<style type="text/css">
+    .recorder-header-container {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 100px;
+        border-bottom: solid 1px #BFC0C1;
+    }
+    .recorder-recorder-container {
+        position: absolute;
+        top: 0;
+        left: 0;
+        bottom: 0;
+        width: 330px;
+        border-right: solid 1px #BFC0C1;
+    }
+    .recorder-recorder-container button {
+        width: 60px;
+        height: 60px;
+        position: absolute;
+        padding: 0;
+        margin: 0;
+        left: 20px;
+        top: 20px;
+        font-size: 40px;
+    }
+    .recorder-recorder-container button.btn-default {
+        color: #F37321;
+        border: solid 1px #F37321;
+    }
+    .recorder-recorder-container span {
+        position: absolute;
+        top: 0;
+        left: 100px;
+        display: inline-block;
+        font-size: 60px;
+        height: 100%;
+        line-height: 100px;
+    }
+    .recorder-player-container {
+        position: absolute;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        width: calc(100% - 330px);
+    }
+    .recorder-player-container .player-info {
+        position: absolute;
+        top: 0;
+        left: 0;
+        bottom: 0;
+        width: calc(100% - 320px);
+        padding: 20px 10px 20px 20px;
+    }
+    .recorder-player-container .player-info .slider.slider-horizontal {
+        position: absolute;
+        bottom: 25px;
+        left: 30px;
+        right: 20px;
+        width: auto;
+    }
+    .recorder-player-container .player-info .times span {
+        font-size: 16px;
+    }
+    .recorder-player-container .player-info .times span:first-child {
+        float: left;
+    }
+    .recorder-player-container .player-info .times span:last-child {
+        float: right;
+    }
+    .recorder-player-container #recorder-player-controller {
+        position: absolute;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        width: 320px;
+        padding: 20px 10px;
+    }
+    #recorder-player-controller button {
+        width: 60px;
+        height: 60px;
+        padding: 0;
+        margin: 0 6px;
+        font-size: 40px;
+    }
+
+    #recorder-recorded-songs-container {
+        position: absolute;
+        top: 100px;
+        left: 0;
+        right: 0;
+        height: calc(100% - 100px);
+    }
+
+    .recorded-songs-table {
+        table-layout: fixed;
+    }
+    .recorded-songs-table tbody tr td {
+        vertical-align: middle;
+        height: 61px;
+    }
+    .recorded-songs-table tbody tr td:nth-child(1) {
+        width: 65px;
+        text-align: right;
+    }
+    .recorded-songs-table tbody tr td:nth-child(2) {
+        padding-right: 50px;
+        word-wrap: break-word;
+        position: relative;
+    }
+    .recorded-songs-table tbody tr td:nth-child(2) button {
+        position: absolute;
+        top: 50%;
+        transform: translateY(-50%);
+        -webkit-transform: translateY(-50%);
+        right: 5px;
+    }
+    .recorded-songs-table tbody tr td:nth-child(3) {
+        width: 76px;
+        text-align: right;
+    }
+    .recorded-songs-table tbody tr td:nth-child(4) {
+        width: 130px;
+    }
+    .recorded-songs-table tbody tr td:nth-child(5), .recorded-songs-table tbody tr td:nth-child(6) {
+        width: 61px;
+        text-align: center;
+        padding: 0;
+    }
+    .recorded-songs-table tbody tr td button, .recorded-songs-table tbody tr td button:hover, .recorded-songs-table tbody tr td button:focus {
+        background: #FFFFFF;
+        width: 36px;
+        height: 36px;
+        font-size: 20px;
+        padding: 0;
+    }
+    .recorded-songs-table tbody tr td.disabled {
+        background: transparent;
+        color: #BFC0C1;
+    }
+    .recorded-songs-table tbody tr td.disabled img {
+        opacity: 0.5;
+    }
+    .recorded-songs-table tbody tr td.disabled button {
+        opacity: 0.5;
+    }
+</style>
+
+<script type="text/html" id="header">
+    <div id="header-left" class="float-left"></div>
+    <div class="float-right">
+        <button class="user-button icbtn icbtn-user" onclick="PP2_FRONT.showModal('users', 420);">&nbsp;</button>
+        <button class="icbtn icbtn-remotecontroller" onclick="PP2_FRONT.showRightModal('settings_handler', 1000);">&nbsp;</button>
+    </div>
+</script>
+
+<script type="text/html" id="body">
+    <div class="recorder-header-container">
+        <div class="recorder-recorder-container">
+            <button class="btn btn-default glyphicon myglyphicon-black-large-circle"></button>
+            <span id="recorder-recorder-time">00:00</span>
+        </div>
+        <div class="recorder-player-container">
+            <div class="player-info">
+                <div class="times">
+                    <span id="recorder-player-time">00:00</span>
+                    <span id="recorder-player-duration">00:00</span>
+                </div>
+                <div id="recorder-player-position-slider"></div>
+            </div>
+            <div id="recorder-player-controller">
+                <button class="btn btn-default glyphicon myglyphicon-reset" disabled></button>
+                <button class="btn btn-default glyphicon myglyphicon-play" disabled></button>
+                <button class="btn btn-default glyphicon myglyphicon-rew" disabled></button>
+                <button class="btn btn-default glyphicon myglyphicon-ff" disabled></button>
+            </div>
+        </div>
+    </div>
+    <div id="recorder-recorded-songs-container" class="scrollable"></div>
+    <div id="diary-right-content-recorded-song-name-edit-overlay-container" style="display: none;"></div>
+</script>
+
+<script type="text/html" id="footer">
+</script>

@@ -1,0 +1,105 @@
+<!-- エディタ参照のみの用途 -->
+<head>
+    <link rel="stylesheet" type="text/css" href="../../bootstrap-3.3.6-dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" type="text/css" href="../../bootstrap-3.3.6-dist/css/bootstrap-theme.min.css" />
+    <link rel="stylesheet" type="text/css" href="../../animsition/css/animsition.min.css" />
+    <link rel="stylesheet" type="text/css" href="../../css/pp2.css" />
+</head>
+<!-- / -->
+
+<script type="text/javascript">
+    $(function() {
+        var keyToScale = function(key) {
+            var scales = ['A', 'A#', 'B', 'C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#'];
+            return scales[(key - 0x15) % 12] + Math.floor((key - 0x15 + 9) / 12);
+        };
+
+        var currentActivity = PP2_FRONT.scriptPool.diaryRightContentIF.getActivity();
+        var countsOfEachKeys = JSON.parse(currentActivity.countsOfEachKeys);
+        var data = {
+            labels: [],
+            datasets: [{
+                label: 'Very soft',
+                backgroundColor: '#3b9484',
+                data: []
+            }, {
+                label: 'Soft',
+                backgroundColor: '#A5CC52',
+                data: []
+            }, {
+                label: 'Medium',
+                backgroundColor: '#FCD465',
+                data: []
+            }, {
+                label: 'Strong',
+                backgroundColor: '#F2B361',
+                data: []
+            }, {
+                label: 'Very strong',
+                backgroundColor: '#FF6669',
+                data: []
+            }]
+        };
+        for (var key = 0x15; key <= 0x6C; key++) {
+            data.labels.push(keyToScale(key));
+            for (var velocityLevel = 0; velocityLevel < 5; velocityLevel++) {
+                var value = 0;
+                if (undefined !== countsOfEachKeys[key]) {
+                    value = countsOfEachKeys[key][velocityLevel];
+                }
+                data.datasets[velocityLevel].data.push(value);
+            }
+        }
+        var ctx = $('#diary-right-content-per-key-graph-canvas')[0].getContext("2d");
+        new Chart(ctx, {
+            type: 'bar',
+            data: data,
+            options: {
+                maintainAspectRatio: false,
+                title:{
+                    display: false,
+                    text: ""
+                },
+                tooltips: {
+                    mode: 'index',
+                    intersect: false
+                },
+                responsive: true,
+                scales: {
+                    xAxes: [{
+                        stacked: true,
+                    }],
+                    yAxes: [{
+                        stacked: true
+                    }]
+                },
+                legend: {
+                    position: 'bottom'
+                }
+            }
+        });
+    });
+</script>
+
+<style type="text/css">
+    .diary-right-content-per-key-graph-canvas-container {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        bottom: 0;
+        left: 10px;
+    }
+    #diary-right-content-per-key-graph-canvas {
+        position: absolute;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        left: 0;
+    }
+</style>
+
+<script type="text/html" id="body">
+    <div class="diary-right-content-per-key-graph-canvas-container">
+        <canvas id="diary-right-content-per-key-graph-canvas"></canvas>
+    </div>
+</script>

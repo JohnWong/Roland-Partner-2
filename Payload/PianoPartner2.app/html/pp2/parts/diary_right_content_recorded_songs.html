@@ -1,0 +1,243 @@
+<!-- エディタ参照のみの用途 -->
+<head>
+    <link rel="stylesheet" type="text/css" href="../../bootstrap-3.3.6-dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" type="text/css" href="../../bootstrap-3.3.6-dist/css/bootstrap-theme.min.css" />
+    <link rel="stylesheet" type="text/css" href="../../animsition/css/animsition.min.css" />
+    <link rel="stylesheet" type="text/css" href="../../css/pp2.css" />
+</head>
+<!-- / -->
+
+<script type="text/javascript">
+    $(function() {
+        var currentActivity = PP2_FRONT.scriptPool.diaryRightContentIF.getActivity();
+
+        var player = $('.diary-right-content-recorded-song-player');
+        var playerInfoSpans = player.find('.info').find('span');
+        var positionSlider = PP2_FRONT.initSliderWithoutMIDIConnection(player.find('.position-slider'), playerInfoSpans.eq(0), {}, function(v) {
+            var seconds = Math.floor(v / 1000);
+            return _.sprintf('%02d:%02d', Math.floor(seconds / 60), seconds % 60);
+        }, function(v) {
+            PP2_PLAYER.setPosition(v);
+        });
+        positionSlider.sliderElement.slider('disable');
+        var playerControllerButtons = player.find('.controller-buttons').find('button');
+        PP2_PLAYER.removeAllEventListeners();
+        PP2_PLAYER.initController(playerControllerButtons.eq(1), playerControllerButtons.eq(0), playerControllerButtons.eq(2), playerControllerButtons.eq(3), positionSlider, ['myglyphicon-play', 'myglyphicon-pause']);
+        playerControllerButtons.eq(1).on('click', function () {
+            PP2_CORE.countUpUseCount(PP2_CORE.countTargets.DiaryPlayButton);
+        });
+
+        var changePlayerButtonsActivation = function(isActive) {
+            if (isActive) {
+                positionSlider.sliderElement.slider('enable');
+                playerControllerButtons.removeProp('disabled');
+            } else {
+                positionSlider.sliderElement.slider('disable');
+                playerControllerButtons.prop('disabled', true);
+            }
+        };
+
+        // 編集ダイアログのロード
+        var overlayContainer = $('#diary-right-content-recorded-song-name-edit-overlay-container');
+        PP2_FRONT.loadPartsToElement(overlayContainer, 'recorded_song_name_edit_overlay');
+
+        var tbody = $('.diary-right-content-recorded-songs-table').find('tbody');
+        var startAt = new Date(currentActivity.startAt);
+        var refreshRecordedSongs = function() {
+            PP2_DB_AWS_HANDLER.requestRecordedSongsOnDay(startAt.getFullYear(), startAt.getMonth() + 1, startAt.getDate(), function (items) {
+                items = _.sortBy(items, 'startAt');
+                items = items.reverse();
+                tbody.empty();
+                _.forEach(items, function (item, index) {
+                    var time = _.sprintf('%02d:%02d', Math.floor(item.lengthOfTime / 60), item.lengthOfTime % 60);
+                    $('<tr />').append($('<td />').append($('<button class="btn btn-default glyphicon glyphicon-share" style="display: none;"></button>').on('click', function () {
+                            PP2_FRONT.confirm(PP2_LANGUAGE.getValues().confirm_move_to_recorder, function () {
+                                changePlayerButtonsActivation(false);
+                                item.isAutoRecorded = false;
+                                PP2_DB.createOrUpdateRecordedSong(item, function () {
+                                    refreshRecordedSongs();
+                                });
+                            });
+                        })))
+                        .append($('<td />').text((index + 1) + '.'))
+                        .append($('<td />').text(item.name).append(
+                            $('<button />').addClass('btn btn-default glyphicon glyphicon-pencil').css('display', 'none').on('click', function() {
+                                // 曲名の編集
+                                PP2_FRONT.scriptPool.recordedSongsNameEditOverlayIF.show(overlayContainer, item, function() {
+                                    refreshRecordedSongs();
+                                });
+                            })
+                        ))
+                        .append($('<td />').text(time))
+                        .append($('<td />').append($('<button class="btn btn-default glyphicon glyphicon-trash" style="display: none;"></button>').on('click', function () {
+                            PP2_FRONT.confirm([PP2_LANGUAGE.getValues().confirm_remove_auto_recorded_song, PP2_LANGUAGE.getValues().confirm_ok_delete, PP2_LANGUAGE.getValues().confirm_cancel], function() {
+                                changePlayerButtonsActivation(false);
+                                item.removed = true;
+                                PP2_DB.createOrUpdateRecordedSong(item, function () {
+                                    refreshRecordedSongs();
+                                });
+                            });
+                        })))
+                        .on('click', function () {
+                            tbody.find('.info').removeClass('info').find('button').hide();
+                            $(this).addClass('info').find('button').show();
+                            var refreshPlayerInfo = function() {
+                                var seconds = Math.floor(PP2_PLAYER.getDuration() / 1000);
+                                playerInfoSpans.eq(1).text(_.sprintf('%02d:%02d', Math.floor(seconds / 60), seconds % 60));
+                                positionSlider.sliderElement.slider('setAttribute', 'max', PP2_PLAYER.getDuration());
+                                positionSlider.setValue(PP2_PLAYER.getPosition());
+                                changePlayerButtonsActivation(true);
+                            };
+                            if (undefined === PP2_PLAYER.getCurrentRecordedSong() || PP2_PLAYER.getCurrentRecordedSong().objectId !== item.objectId) {
+                                PP2_PLAYER.load(item, refreshPlayerInfo);
+                            } else {
+                                refreshPlayerInfo();
+                            }
+                        })
+                        .appendTo(tbody);
+                });
+                if (items.length > 0) {
+                    if (undefined !== PP2_PLAYER.getCurrentRecordedSong()) {
+                        if (!PP2_PLAYER.getCurrentRecordedSong().isAutoRecorded) {
+                            // レコーダー用の録音曲が読み込まれている場合は自動選択しない
+                            return;
+                        }
+
+                        var index = _.findIndex(items, {objectId: PP2_PLAYER.getCurrentRecordedSong().objectId});
+                        if (index >= 0) {
+                            tbody.find('tr').eq(index).trigger('click');
+                            return;
+                        }
+                    }
+                }
+            });
+        };
+        refreshRecordedSongs();
+    });
+</script>
+
+<style type="text/css">
+    .diary-right-content-recorded-song-player {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 60px;
+    }
+    .diary-right-content-recorded-song-player div.info {
+        position: absolute;
+        top: 0;
+        right: 217px;
+        bottom: 0;
+        left: 0;
+    }
+    .diary-right-content-recorded-song-player div.info span:first-child {
+        float: left;
+        line-height: 62px;
+        padding-left: 13px;
+    }
+    .diary-right-content-recorded-song-player div.info span:last-child {
+        float: right;
+        line-height: 62px;
+        padding-right: 13px;
+    }
+    .diary-right-content-recorded-song-player div.info .slider.slider-horizontal {
+        position: absolute;
+        left: 75px;
+        right: 75px;
+        top: 21px;
+        width: auto;
+    }
+    .diary-right-content-recorded-song-player div.controller-buttons {
+        position: absolute;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        width: 217px;
+        padding: 13px;
+    }
+    .diary-right-content-recorded-song-player div.controller-buttons button {
+        width: 36px;
+        height: 36px;
+    }
+    .diary-right-content-recorded-song-table-container {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        height: calc(100% - 60px);
+        border-top: solid 1px #BFC0C1;;
+    }
+
+    .diary-right-content-recorded-songs-table {
+        table-layout: fixed;
+    }
+    .diary-right-content-recorded-songs-table tbody tr td {
+        vertical-align: middle;
+        height: 53px;
+    }
+    .diary-right-content-recorded-songs-table tbody tr td:nth-child(1) {
+        width: 53px;
+        padding: 0;
+        text-align: center;
+        vertical-align: middle;
+    }
+    .diary-right-content-recorded-songs-table tbody tr td:nth-child(2) {
+        width: 65px;
+        text-align: right;
+    }
+    .diary-right-content-recorded-songs-table tbody tr td:nth-child(3) {
+        padding-right: 50px;
+        word-wrap: break-word;
+        position: relative;
+    }
+    .diary-right-content-recorded-songs-table tbody tr td:nth-child(3) button {
+        position: absolute;
+        top: 50%;
+        transform: translateY(-50%);
+        -webkit-transform: translateY(-50%);
+        right: 5px;
+    }
+    .diary-right-content-recorded-songs-table tbody tr td:nth-child(4) {
+        width: 76px;
+        text-align: right;
+    }
+    .diary-right-content-recorded-songs-table tbody tr td:nth-child(5) {
+        width: 53px;
+        padding: 0;
+        text-align: center;
+        vertical-align: middle;
+    }
+    .diary-right-content-recorded-songs-table tbody tr td button, .diary-right-content-recorded-songs-table tbody tr td button:hover, .diary-right-content-recorded-songs-table tbody tr td button:focus {
+        background: #FFFFFF;
+        width: 36px;
+        height: 36px;
+        margin: 0 5px;
+        font-size: 20px;
+        padding: 0;
+    }
+</style>
+
+<script type="text/html" id="body">
+    <div class="diary-right-content-recorded-song-player">
+        <div class="info">
+            <span>00:00</span>
+            <div class="position-slider"></div>
+            <span>00:00</span>
+        </div>
+        <div class="controller-buttons">
+            <button class="btn btn-default glyphicon myglyphicon-reset" disabled></button>
+            <button class="btn btn-default glyphicon myglyphicon-play" disabled></button>
+            <button class="btn btn-default glyphicon myglyphicon-rew" disabled></button>
+            <button class="btn btn-default glyphicon myglyphicon-ff" disabled></button>
+        </div>
+    </div>
+    <div class="diary-right-content-recorded-song-table-container scrollable">
+        <table class="table data-table diary-right-content-recorded-songs-table">
+            <thead></thead>
+            <tbody></tbody>
+        </table>
+    </div>
+
+    <div id="diary-right-content-recorded-song-name-edit-overlay-container" style="display: none;"></div>
+</script>
