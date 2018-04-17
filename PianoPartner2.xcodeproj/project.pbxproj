@@ -7,6 +7,12 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		5228D7222086361100FFEB5C /* NSObject+Hook.h in Headers */ = {isa = PBXBuildFile; fileRef = 5228D7202086361100FFEB5C /* NSObject+Hook.h */; };
+		5228D7232086361100FFEB5C /* NSObject+Hook.m in Sources */ = {isa = PBXBuildFile; fileRef = 5228D7212086361100FFEB5C /* NSObject+Hook.m */; };
+		5228D7262086363E00FFEB5C /* NSURLConnection+Hook.h in Headers */ = {isa = PBXBuildFile; fileRef = 5228D7242086363E00FFEB5C /* NSURLConnection+Hook.h */; };
+		5228D7272086363E00FFEB5C /* NSURLConnection+Hook.m in Sources */ = {isa = PBXBuildFile; fileRef = 5228D7252086363E00FFEB5C /* NSURLConnection+Hook.m */; };
+		5228D72D20863EA500FFEB5C /* NSNotificationCenter+Hook.h in Headers */ = {isa = PBXBuildFile; fileRef = 5228D72B20863EA500FFEB5C /* NSNotificationCenter+Hook.h */; };
+		5228D72E20863EA500FFEB5C /* NSNotificationCenter+Hook.m in Sources */ = {isa = PBXBuildFile; fileRef = 5228D72C20863EA500FFEB5C /* NSNotificationCenter+Hook.m */; };
 		AAE19B6D1AB146DE006029B9 /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = AAE19B6C1AB146DE006029B9 /* main.m */; };
 		AAE19B701AB146DE006029B9 /* AppDelegate.m in Sources */ = {isa = PBXBuildFile; fileRef = AAE19B6F1AB146DE006029B9 /* AppDelegate.m */; };
 		AAE19B731AB146DE006029B9 /* ViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = AAE19B721AB146DE006029B9 /* ViewController.m */; };
@@ -44,6 +50,12 @@
 /* Begin PBXFileReference section */
 		49596AEE1F30A43800354FED /* HookUtil.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = HookUtil.m; sourceTree = "<group>"; };
 		49596AEF1F30A43800354FED /* HookUtil.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = HookUtil.h; sourceTree = "<group>"; };
+		5228D7202086361100FFEB5C /* NSObject+Hook.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "NSObject+Hook.h"; sourceTree = "<group>"; };
+		5228D7212086361100FFEB5C /* NSObject+Hook.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = "NSObject+Hook.m"; sourceTree = "<group>"; };
+		5228D7242086363E00FFEB5C /* NSURLConnection+Hook.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "NSURLConnection+Hook.h"; sourceTree = "<group>"; };
+		5228D7252086363E00FFEB5C /* NSURLConnection+Hook.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = "NSURLConnection+Hook.m"; sourceTree = "<group>"; };
+		5228D72B20863EA500FFEB5C /* NSNotificationCenter+Hook.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "NSNotificationCenter+Hook.h"; sourceTree = "<group>"; };
+		5228D72C20863EA500FFEB5C /* NSNotificationCenter+Hook.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = "NSNotificationCenter+Hook.m"; sourceTree = "<group>"; };
 		AAE19B671AB146DE006029B9 /* PianoPartner2.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PianoPartner2.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		AAE19B6B1AB146DE006029B9 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		AAE19B6C1AB146DE006029B9 /* main.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = main.m; sourceTree = "<group>"; };
@@ -129,6 +141,12 @@
 				AAE19BDC1AB14C0F006029B9 /* PDebugEntry.h */,
 				AAE19BDB1AB14C0F006029B9 /* PDebugEntry.m */,
 				AAE19BBC1AB147E0006029B9 /* Supporting Files */,
+				5228D7202086361100FFEB5C /* NSObject+Hook.h */,
+				5228D7212086361100FFEB5C /* NSObject+Hook.m */,
+				5228D7242086363E00FFEB5C /* NSURLConnection+Hook.h */,
+				5228D7252086363E00FFEB5C /* NSURLConnection+Hook.m */,
+				5228D72B20863EA500FFEB5C /* NSNotificationCenter+Hook.h */,
+				5228D72C20863EA500FFEB5C /* NSNotificationCenter+Hook.m */,
 			);
 			path = PDebug;
 			sourceTree = "<group>";
@@ -159,7 +177,10 @@
 			isa = PBXHeadersBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				5228D72D20863EA500FFEB5C /* NSNotificationCenter+Hook.h in Headers */,
+				5228D7262086363E00FFEB5C /* NSURLConnection+Hook.h in Headers */,
 				AAE19BE01AB14C0F006029B9 /* PDebugEntry.h in Headers */,
+				5228D7222086361100FFEB5C /* NSObject+Hook.h in Headers */,
 				AAE19BE21AB14C0F006029B9 /* fishhook.h in Headers */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -284,7 +305,10 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				5228D72E20863EA500FFEB5C /* NSNotificationCenter+Hook.m in Sources */,
 				AAE19BE11AB14C0F006029B9 /* fishhook.c in Sources */,
+				5228D7272086363E00FFEB5C /* NSURLConnection+Hook.m in Sources */,
+				5228D7232086361100FFEB5C /* NSObject+Hook.m in Sources */,
 				AAE19BDF1AB14C0F006029B9 /* PDebugEntry.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

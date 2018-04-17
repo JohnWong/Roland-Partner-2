@@ -1,0 +1,2 @@
+https://mb.api.cloud.nifty.com/2013-09-01/classes/StatusLog
+https://mb.api.cloud.nifty.com/2013-09-01/files?where=%7B%22fileName%22:%22CE35C_0001_GL.zip%22%7D

@@ -1,0 +1,27 @@
+2018-04-17 21:32:40.447839+0800 PianoPartner2[8145:5787661] Scanning for MIDI service 03B80E5A-EDE8-4B33-A751-6CE34EC4C700
+2018-04-17 21:32:40.512344+0800 PianoPartner2[8145:5787661] peripheral isAvailable changed to 1 in didDiscoverPeripheral
+2018-04-17 21:32:41.565641+0800 PianoPartner2[8145:5787661] Connecting to peripheral with UUID 551B8A99-B8C2-4225-BAC6-21A8BFA10D4E ...
+2018-04-17 21:32:42.334875+0800 PianoPartner2[8145:5787661] Checking pairing status...
+2018-04-17 21:32:42.394442+0800 PianoPartner2[8145:5787661] Pairing authentication successful.
+2018-04-17 21:32:42.396534+0800 PianoPartner2[8145:5787661] Instructing the driver to connect to peripheral with UUID 551B8A99-B8C2-4225-BAC6-21A8BFA10D4E
+2018-04-17 21:32:43.398144+0800 PianoPartner2[8145:5787661] Disconnecting from UI for peripheral <CBPeripheral: 0x1c011b750, identifier = 551B8A99-B8C2-4225-BAC6-21A8BFA10D4E, name = FP-30, state = connected>. The driver will manage the connection.
+2018-04-17 21:32:45.591359+0800 PianoPartner2[8145:5787661] No longer scanning for MIDI peripherals.
+2018-04-17 21:32:45.592359+0800 PianoPartner2[8145:5789062] [CoreBluetooth] XPC connection invalid
+2018-04-17 21:32:46.179915+0800 PianoPartner2[8145:5787661] pp2-script://setMIDIDeviceName?value=FP-30
+2018-04-17 21:32:46.180009+0800 PianoPartner2[8145:5787661] setMIDIDeviceName
+2018-04-17 21:32:46.213521+0800 PianoPartner2[8145:5787661] pp2-script://setMIDIDeviceName?value=FP-30
+2018-04-17 21:32:46.213584+0800 PianoPartner2[8145:5787661] setMIDIDeviceName
+2018-04-17 21:32:46.448095+0800 PianoPartner2[8145:5787661] pp2-script://requestContentsFile?fileName=CE35C_0001_GL&modelId=4200002000010000&taskId=task_1523971966443_3659678
+2018-04-17 21:32:46.448311+0800 PianoPartner2[8145:5787661] requestContentsFile
+2018-04-17 21:32:51.473276+0800 PianoPartner2[8145:5789061] [] tcp_timers tcp[8] retransmit SYN 3
+2018-04-17 21:32:51.883556+0800 PianoPartner2[8145:5789062] [] tcp_timers tcp[8] retransmit SYN 4
+2018-04-17 21:32:52.290341+0800 PianoPartner2[8145:5789062] [] tcp_timers tcp[8] retransmit SYN 5
+2018-04-17 21:32:52.843700+0800 PianoPartner2[8145:5789062] [] tcp_timers tcp[8] retransmit SYN 6
+2018-04-17 21:32:53.947888+0800 PianoPartner2[8145:5789061] [] tcp_timers tcp[8] retransmit SYN 7
+2018-04-17 21:32:56.150226+0800 PianoPartner2[8145:5789061] [] tcp_timers tcp[8] retransmit SYN 8
+2018-04-17 21:32:59.480414+0800 PianoPartner2[8145:5789061] NSURLConnection finished with error - code -1001
+2018-04-17 21:32:59.516692+0800 PianoPartner2[8145:5788981] Task <E866558D-2FD7-4209-B9F4-A10CD2E6E887>.<0> HTTP load failed (error code: -999 [1:89])
+2018-04-17 21:32:59.553253+0800 PianoPartner2[8145:5787661] pp2-script://setMIDIDeviceName?value=
+2018-04-17 21:32:59.553380+0800 PianoPartner2[8145:5787661] setMIDIDeviceName
+2018-04-17 21:32:59.558176+0800 PianoPartner2[8145:5787661] pp2-script://setUptime?value=0
+2018-04-17 21:32:59.558349+0800 PianoPartner2[8145:5787661] setUptime
